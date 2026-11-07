@@ -574,19 +574,10 @@ end
 local SIZE_IDS = { compact = true, standard = true, spacious = true }
 
 local function model(cx)
-	local own, byTab = ours(cx)
+	local own = ours(cx)
 	local agents = {}
 	for _, agent in cx.agents:list() do agents[agent.pane] = agent end
 	local focused = cx.session:focused()
-	local panel = focused and byTab[cx.session:tab_of(focused)]
-	local panelShare = 0.22
-	if panel then
-		local layout = cx.session:layout(cx.session:tab_of(panel))
-		local root = layout and layout.root
-		if root and root.split == "right" and root[1] and root[1].pane == panel and root.ratio then
-			panelShare = root.ratio
-		end
-	end
 
 	local panesByTab = {}
 	for _, pane in cx.session:panes() do
@@ -821,7 +812,6 @@ local function model(cx)
 		size = if SIZE_IDS[tern.kv.get("size")] then tern.kv.get("size") else "standard",
 		refOpen = records("ref-open"),
 		vitals = Vitals.model(cx),
-		vitalsShare = panelShare,
 	}
 end
 
@@ -1548,12 +1538,16 @@ function quickAction(cx, act, value)
 			for _, p in tabPanes(cx, id) do cx.layout:close(p.pane) end
 			if byTab[id] then cx.layout:close(byTab[id]) end
 		end
-	elseif act == "addhost" then
-		cx:command("add_remote_host")
 	elseif act == "host" then
 		local id = tonumber(value)
 		if id and cx.hosts:current().id ~= id then cx.hosts:switch(id) end
 		redraw()
+	elseif act == "newonhost" then
+		local id = tonumber(value)
+		if id then
+			if cx.hosts:current().id ~= id then cx.hosts:switch(id) end
+			cx.sessions:create({})
+		end
 	elseif act == "url" then
 		local url = unhex(value)
 		if url and url ~= "" then cx:open(url) end

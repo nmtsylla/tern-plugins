@@ -1,53 +1,76 @@
-/* Kai: spacing and shading only. Every part is a native Tern element (section, item, icon,
-   badge); colors come from Tern's own variables. Plugin sheets are global, so every rule is
-   scoped to a kai role. */
+/* Kai: a sidebar that reads like a native one. Tern's sans face at its UI size, quiet sentence-case
+   labels, one soft rounded shade for hover and for the pane you are in, and color only where a state
+   needs it. Every part is a native Tern element (section, item, icon, badge); colors come from Tern's
+   own variables. Plugin sheets are global, so every rule is scoped to a kai role.
 
-/* Layout and spacing */
-[data-role='kai.root'] {
-  gap: 20px;
-  padding: 8px 6px;
+   Type, in em of the UI size (13px): 1 names and rows, .885 labels and paths, .846 machine rows and
+   small captions, .81 meters. Standard is the base here; Compact and Spacious change heights only. */
+
+
+/* Muted text in Tern's theme is its comment color, a tinted blue; a sidebar's secondary text reads as
+   a neutral dim, so every muted span here uses the theme's quiet text color instead. */
+[data-role='kai.root'] .sf-t-muted,
+[data-role='kai.vitalsSection'] .sf-t-muted {
+  color: var(--t3);
 }
-[data-role='kai.workspace'] .sf-section-body {
-  gap: 10px;
-  padding-top: 10px;
+/* Layout */
+[data-role='kai.root'] {
+  gap: 2px;
+  padding: 0 8px 14px;
+  font-family: var(--sans);
+}
+[data-role='kai.workspace'] > .sf-section-body {
+  gap: 2px;
+  padding: 2px 0 6px;
+  margin-left: 0;
+  box-shadow: none;
 }
 [data-role='kai.list'] {
-  gap: 4px;
+  gap: 2px;
 }
 
-/* Rows: one height everywhere (workspace heads, tab heads, panes), a faint shade on hover,
-   and a slightly darker one on the focused pane. Never an accent color. */
+/* Rows: one height everywhere (workspace heads, tab heads, panes), a faint shade on hover, and a
+   stronger one on the pane you are in. Never an accent color. */
 [data-role='kai.row'],
 [data-role='kai.rowFocused'] {
   align-items: center;
   gap: 4px;
-  padding-right: 6px;
+  padding-right: 8px;
   border-radius: 8px;
 }
 [data-role='kai.row'] > .sf-item,
 [data-role='kai.rowFocused'] > .sf-item {
-  min-height: calc(var(--sf-lh) + 20px);
-  padding: 6px 10px;
+  min-height: 28px;
+  padding: 0 0 0 8px;
+  gap: 9px;
   background: transparent;
   box-shadow: none;
 }
+[data-role='kai.row'] .sf-item-detail,
+[data-role='kai.rowFocused'] .sf-item-detail {
+  color: var(--t3);
+  font-size: 0.885em;
+}
 [data-role='kai.row']:hover {
-  background: color-mix(in srgb, black 14%, transparent);
+  background: color-mix(in srgb, var(--t1) 6%, transparent);
 }
 [data-role='kai.rowFocused'] {
-  background: color-mix(in srgb, black 10%, transparent);
+  background: color-mix(in srgb, var(--t1) 10%, transparent);
 }
 [data-role='kai.rowFocused']:hover {
-  background: color-mix(in srgb, black 14%, transparent);
+  background: color-mix(in srgb, var(--t1) 12%, transparent);
 }
 [data-role='kai.root'] .sf-section-head {
-  min-height: calc(var(--sf-lh) + 20px);
-  padding: 6px 10px;
+  min-height: 28px;
+  padding: 0 8px;
   border-radius: 8px;
   align-items: center;
 }
 [data-role='kai.root'] .sf-section-head:hover {
-  background: color-mix(in srgb, black 14%, transparent);
+  background: color-mix(in srgb, var(--t1) 6%, transparent);
+}
+[data-role='kai.root'] .sf-section-head > .sf-chev {
+  color: var(--t3);
 }
 
 /* Panes inside a multi-pane tab sit one indent deeper; pull their shade back out to the same
@@ -58,9 +81,119 @@
   padding-left: 22px;
 }
 
-/* Workspace head: name and branch over a smaller path, status pills at the right edge. */
+/* Header: a quiet label and its controls, 26px square like the rest of a sidebar's buttons. */
+[data-role='kai.header'] {
+  align-items: center;
+  gap: 2px;
+  height: 31px;
+  padding: 0 2px 0 8px;
+  color: var(--t3);
+  font-size: 0.885em;
+}
+[data-role='kai.header'] > .sf-text {
+  color: var(--t3);
+}
+[data-role='kai.header'] > .sf-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--t3);
+  cursor: pointer;
+}
+[data-role='kai.header'] > .sf-icon:hover {
+  color: var(--t1);
+  background: color-mix(in srgb, var(--t1) 8%, transparent);
+}
+[data-role='kai.ice'],
+[data-role='kai.iceOn'] {
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  color: var(--t3);
+  font-size: 0.885em;
+  cursor: pointer;
+}
+[data-role='kai.iceOn'] {
+  color: var(--t1);
+  background: color-mix(in srgb, var(--t1) 10%, transparent);
+}
+
+/* A machine: icon, name, a + for a new workspace there, a status dot, and the fold chevron at the
+   far end, over its workspace rows. */
+[data-role='kai.host'] {
+  margin-top: 4px;
+}
+[data-role='kai.root'] [data-role='kai.host'] > .sf-section-head {
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+}
+[data-role='kai.host'] > .sf-section-head > .sf-chev,
+[data-role='kai.workspace'] > .sf-section-head > .sf-chev {
+  order: 9;
+}
+[data-role='kai.host'] > .sf-section-body {
+  box-shadow: none;
+  margin-left: 0;
+  padding: 0;
+}
+[data-role='kai.hostBody'] {
+  gap: 2px;
+}
+[data-role='kai.hostHead'] {
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+  color: var(--t3);
+  font-size: 0.846em;
+}
+[data-role='kai.hostHead'] > .sf-icon {
+  flex: none;
+  color: var(--t3);
+}
+[data-role='kai.hostName'] {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--t3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+[data-role='kai.hostNew'] {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+[data-role='kai.hostNew']:hover {
+  color: var(--t1);
+  background: color-mix(in srgb, var(--t1) 8%, transparent);
+}
+[data-role='kai.hostDot'] {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tc);
+}
+
+/* Workspace row: tile, name, then the folder dim at the right with the branch's drift. */
+[data-role='kai.workspace'] {
+  padding: 0;
+  border: 0;
+  background: none;
+}
 [data-role='kai.workspace'] > .sf-section-head {
   min-width: 0;
+  min-height: 30px;
 }
 [data-role='kai.root'] .sf-section-head > .sf-head {
   flex: 1 1 auto;
@@ -70,7 +203,7 @@
 [data-role='kai.tabHead'] {
   width: 100%;
   align-items: center;
-  gap: 6px;
+  gap: 9px;
   min-width: 0;
 }
 [data-role='kai.wsHead'] > .sf-badge {
@@ -78,21 +211,66 @@
 }
 [data-role='kai.wsText'] {
   flex: 1 1 0;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
   overflow: hidden;
 }
-[data-role='kai.wsText'] .sf-text {
-  white-space: nowrap;
+[data-role='kai.wsLine'] {
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+[data-role='kai.wsName'] {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 150px;
   overflow: hidden;
+  color: var(--t1);
+  white-space: nowrap;
   text-overflow: ellipsis;
 }
-[data-role='kai.wsText'] > .sf-text + .sf-text {
-  font-size: 0.82em;
+[data-role='kai.wsPath'] {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--t3);
+  font-size: 0.885em;
+  text-align: right;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+[data-role='kai.wsDrift'] {
+  flex: none;
+  font-size: 0.885em;
+}
+[data-role='kai.summary'] {
+  color: var(--t3);
+  font-size: 0.846em;
+}
+/* Identity tile: the workspace's initial, white on its own color. */
+[data-role='kai.tile'] {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 5px;
+  font-size: 0.81em;
+  font-weight: 700;
+  color: #fff;
+  background: color-mix(in srgb, var(--tc) 84%, black);
+}
+[data-role='kai.tile'] > .sf-icon {
+  margin: auto;
+  color: #fff;
+}
+row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
+  align-items: center;
+  justify-content: center;
 }
 
 /* Hover buttons (close, new tab, move), the same on every row: no width until the row is
-   hovered, then they slide in, so pills and indicators sit at the row's right edge. */
+   hovered, then they slide in, so indicators sit at the row's right edge. */
 [data-role='kai.grip'] {
   flex-shrink: 0;
   width: 0;
@@ -117,17 +295,17 @@
 
 /* While moving: the slots you can drop into, and the bar naming what is being moved. */
 [data-role='kai.drop'] {
-  min-height: calc(var(--sf-lh) + 12px);
-  padding: 4px 10px;
+  min-height: 28px;
+  padding: 0 8px;
   border: 1px dashed var(--l3);
   border-radius: 8px;
 }
 [data-role='kai.movingBar'] {
   align-items: center;
   gap: 8px;
-  padding: 4px 10px;
+  padding: 4px 8px;
   border-radius: 8px;
-  background: color-mix(in srgb, black 10%, transparent);
+  background: color-mix(in srgb, var(--t1) 8%, transparent);
 }
 
 /* Thin, theme-colored scrollbar (the default draws blurry). Tern's CSS has no :has(), and
@@ -141,133 +319,75 @@
   background: transparent;
 }
 
-/* Workspace views: a segmented control under the path, the same faint shade as the card's
-   rows, with its content using the same row height and left edge as agent rows. */
+/* Workspace views: a row of pills under the head, the open one named and shaded; its content
+   uses the same row height and left edge as agent rows. */
 [data-role='kai.views'] {
   gap: 2px;
-  margin: 2px 0 4px;
-  padding: 3px;
-  border-radius: 10px;
-  background: color-mix(in srgb, black 10%, transparent);
+  margin: 0 0 4px;
+  padding: 0;
 }
 [data-role='kai.view'],
 [data-role='kai.viewOn'] {
   display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  gap: 1px;
-  height: 40px;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
   color: var(--t3);
+  font-size: 0.885em;
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
 }
-[data-role='kai.viewTop'] {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  min-height: 14px;
+[data-role='kai.view'] {
+  flex: 1 1 0;
 }
-[data-role='kai.viewLabel'] {
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 0.75em;
-  line-height: 1.1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-[data-role='kai.viewOn'] [data-role='kai.viewLabel'] {
+[data-role='kai.viewOn'] {
+  flex: 0 0 auto;
   color: var(--t1);
-}
-[data-role='kai.viewCount'] {
-  flex: none;
-  font-size: 0.75em;
+  background: color-mix(in srgb, var(--t1) 10%, transparent);
 }
 [data-role='kai.view']:hover {
   color: var(--t1);
-  background: color-mix(in srgb, black 12%, transparent);
+  background: color-mix(in srgb, var(--t1) 6%, transparent);
 }
-[data-role='kai.viewOn'] {
-  color: var(--t1);
-  background: var(--l2);
-  box-shadow: inset 0 0 0 1px var(--l3);
+[data-role='kai.viewLabel'] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-role='kai.viewCount'] {
+  flex: none;
+  color: var(--tc);
+  font-size: 0.885em;
+  font-weight: 600;
 }
 [data-role='kai.fileRow'] {
-  min-height: calc(var(--sf-lh) + 20px);
-  padding: 6px 10px;
+  min-height: 28px;
+  padding: 0 8px;
   border-radius: 8px;
 }
 [data-role='kai.fileRow']:hover {
-  background: color-mix(in srgb, black 14%, transparent);
+  background: color-mix(in srgb, var(--t1) 6%, transparent);
 }
 [data-role='kai.indent'] {
-  gap: 4px;
+  gap: 2px;
   padding-left: 16px;
 }
 [data-role='kai.heading'] {
-  padding: 10px 10px 2px;
-  font-size: 0.8em;
-  letter-spacing: 0.06em;
-}
-[data-role='kai.remote'] {
-  padding: 4px 10px;
-  color: var(--t2);
+  padding: 8px 8px 2px;
+  font-size: 0.846em;
+  font-weight: 500;
 }
 [data-role='kai.note'] {
-  padding: 6px 10px;
+  padding: 6px 8px;
+  font-size: 0.885em;
 }
 
-/* Workspace card: no surface, border or padding; the host heading separates cards. */
-[data-role='kai.workspace'] {
-  padding: 0;
-  border: 0;
-  background: none;
-}
-[data-role='kai.workspace'] > .sf-section-body {
-  box-shadow: none;
-  margin-left: 0;
-  padding-left: 0;
-  padding-right: 0;
-}
-
-/* Identity tile: the workspace's initial in its own color. */
-[data-role='kai.tile'] {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  line-height: 28px;
-  text-align: center;
-  border-radius: 8px;
-  font-weight: 700;
-  color: var(--tc);
-  background: color-mix(in srgb, var(--tc) 18%, transparent);
-}
-[data-role='kai.tile'] > .sf-icon {
-  margin: auto;
-}
-row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
-  align-items: center;
-  justify-content: center;
-}
-[data-role='kai.summary'] {
-  font-size: 0.82em;
-}
-
-/* Counts on the view buttons. */
-[data-role='kai.view'],
-[data-role='kai.viewOn'] {
-  gap: 4px;
-}
-[data-role='kai.viewCount'] {
-  font-size: 0.78em;
-  font-weight: 600;
-  color: var(--tc);
-}
-
-/* Waiting for you: a steady accent dot with a slow halo. */
+/* Waiting for you: a steady accent dot with a slow halo; idle: a quiet one. */
 [data-role='kai.pulse'] {
   flex-shrink: 0;
   width: 8px;
@@ -281,47 +401,6 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
   from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); }
   to { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); }
 }
-
-[data-role='kai.wsHead'] > .sf-badge {
-  margin-left: auto;
-}
-
-/* Inside a card, every hover/focus shade keeps a gap from the card's border. */
-[data-role='kai.workspace'] {
-  padding: 7px;
-}
-[data-role='kai.workspace'] > .sf-section-head {
-  border-radius: 8px;
-}
-
-/* Header controls and the Ice Box toggle. */
-[data-role='kai.header'] {
-  align-items: center;
-  gap: 8px;
-}
-/* A machine: a flat foldable label (the view headings' small caps) over its workspace cards. */
-[data-role='kai.root'] [data-role='kai.host'] > .sf-section-head {
-  min-height: 0;
-  padding: 2px 2px 2px 0;
-}
-[data-role='kai.host'] > .sf-section-body {
-  box-shadow: none;
-  margin-left: 0;
-  padding-left: 0;
-  padding-top: 8px;
-}
-[data-role='kai.hostBody'] {
-  gap: 20px;
-}
-[data-role='kai.hostHead'] {
-  align-items: center;
-  gap: 6px;
-  font-size: 0.8em;
-  letter-spacing: 0.06em;
-}
-[data-role='kai.hostDot'] {
-  transform: scale(0.6);
-}
 [data-role='kai.idleDot'] {
   flex-shrink: 0;
   width: 5px;
@@ -329,26 +408,6 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
   margin: 0 5px;
   border-radius: 50%;
   background: color-mix(in srgb, var(--t3) 55%, transparent);
-}
-[data-role='kai.hostName'] {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  cursor: pointer;
-}
-[data-role='kai.ice'],
-[data-role='kai.iceOn'] {
-  align-items: center;
-  gap: 3px;
-  padding: 1px 6px;
-  border-radius: 6px;
-  color: var(--t3);
-  font-size: 0.85em;
-  cursor: pointer;
-}
-[data-role='kai.iceOn'] {
-  color: var(--t1);
-  background: var(--l2);
 }
 /* A tab's color, as a small dot before its name. */
 [data-role='kai.colorDot'] {
@@ -360,123 +419,192 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
   background: var(--tc);
 }
 
-/* Sizes. The rules above are Spacious; Standard (the default) and Compact tighten spacing under
-   the size wrapper. Text stays at Tern's UI font size; only padding, gaps and tiles shrink. */
-[data-role='kai.standard'] [data-role='kai.root'] { gap: 12px; }
-[data-role='kai.standard'] [data-role='kai.hostBody'] { gap: 12px; }
-[data-role='kai.standard'] [data-role='kai.workspace'] { padding: 5px; }
-[data-role='kai.standard'] [data-role='kai.workspace'] .sf-section-body { gap: 6px; padding-top: 6px; }
-[data-role='kai.standard'] [data-role='kai.list'] { gap: 2px; }
-[data-role='kai.standard'] [data-role='kai.indent'] { gap: 2px; }
-[data-role='kai.standard'] [data-role='kai.row'] > .sf-item,
-[data-role='kai.standard'] [data-role='kai.rowFocused'] > .sf-item,
-[data-role='kai.standard'] [data-role='kai.fileRow'] { min-height: calc(var(--sf-lh) + 10px); padding: 3px 8px; }
-[data-role='kai.standard'] [data-role='kai.root'] .sf-section-head { min-height: calc(var(--sf-lh) + 10px); padding: 4px 8px; }
-[data-role='kai.standard'] [data-role='kai.tile'] { width: 24px; height: 24px; line-height: 24px; border-radius: 7px; }
-[data-role='kai.standard'] [data-role='kai.views'] { margin: 0 0 2px; padding: 2px; }
-[data-role='kai.standard'] [data-role='kai.view'],
-[data-role='kai.standard'] [data-role='kai.viewOn'] { height: 38px; }
-[data-role='kai.standard'] [data-role='kai.heading'] { padding: 6px 8px 1px; }
-
-[data-role='kai.compact'] [data-role='kai.root'] { gap: 6px; padding: 6px 4px; }
-[data-role='kai.compact'] [data-role='kai.hostBody'] { gap: 6px; }
-[data-role='kai.compact'] [data-role='kai.workspace'] { padding: 3px; border-radius: 10px; }
-[data-role='kai.compact'] [data-role='kai.workspace'] .sf-section-body { gap: 3px; padding-top: 3px; }
-[data-role='kai.compact'] [data-role='kai.list'] { gap: 0; }
-[data-role='kai.compact'] [data-role='kai.indent'] { gap: 0; }
-[data-role='kai.compact'] [data-role='kai.row'] > .sf-item,
-[data-role='kai.compact'] [data-role='kai.rowFocused'] > .sf-item,
-[data-role='kai.compact'] [data-role='kai.fileRow'] { min-height: calc(var(--sf-lh) + 4px); padding: 1px 6px; }
-[data-role='kai.compact'] [data-role='kai.root'] .sf-section-head { min-height: calc(var(--sf-lh) + 4px); padding: 2px 6px; }
-[data-role='kai.compact'] [data-role='kai.tile'] { width: 20px; height: 20px; line-height: 20px; border-radius: 6px; font-size: 0.85em; }
-[data-role='kai.compact'] [data-role='kai.views'] { margin: 0; padding: 1px; border-radius: 8px; }
-[data-role='kai.compact'] [data-role='kai.view'],
-[data-role='kai.compact'] [data-role='kai.viewOn'] { height: 34px; border-radius: 6px; }
-[data-role='kai.compact'] [data-role='kai.heading'] { padding: 4px 6px 0; }
-[data-role='kai.compact'] [data-role='kai.note'] { padding: 2px 6px; }
-
 /* Refs: Kai's own fold rows (Branches, Remotes, a remote, a branch folder). */
 [data-role='kai.refFold'] {
   align-items: center;
   gap: 6px;
-  min-height: calc(var(--sf-lh) + 10px);
-  padding: 3px 8px;
+  min-height: 28px;
+  padding: 0 8px;
   border-radius: 8px;
   cursor: pointer;
 }
 [data-role='kai.refFold']:hover {
-  background: color-mix(in srgb, black 14%, transparent);
+  background: color-mix(in srgb, var(--t1) 6%, transparent);
 }
 
-/* Vitals: the machine the shown session runs on, at the bottom of the sidebar.
-   Compact by design: the equalizer, memory and every disk, no second panel. */
+/* Sizes. The rules above are Standard (the default); Compact and Spacious change heights and gaps
+   under the size wrapper. Text stays at Tern's UI font size. */
+[data-role='kai.compact'] [data-role='kai.root'] { gap: 0; padding-bottom: 8px; }
+[data-role='kai.compact'] [data-role='kai.header'] { height: 26px; }
+[data-role='kai.compact'] [data-role='kai.host'] { margin-top: 2px; }
+[data-role='kai.compact'] [data-role='kai.hostBody'],
+[data-role='kai.compact'] [data-role='kai.list'],
+[data-role='kai.compact'] [data-role='kai.indent'] { gap: 0; }
+[data-role='kai.compact'] [data-role='kai.workspace'] > .sf-section-body { gap: 0; padding: 1px 0 3px; }
+[data-role='kai.compact'] [data-role='kai.row'] > .sf-item,
+[data-role='kai.compact'] [data-role='kai.rowFocused'] > .sf-item,
+[data-role='kai.compact'] [data-role='kai.fileRow'],
+[data-role='kai.compact'] [data-role='kai.refFold'],
+[data-role='kai.compact'] [data-role='kai.drop'] { min-height: 24px; }
+[data-role='kai.compact'] [data-role='kai.root'] .sf-section-head { min-height: 24px; }
+[data-role='kai.compact'] [data-role='kai.root'] [data-role='kai.host'] > .sf-section-head { min-height: 22px; }
+[data-role='kai.compact'] [data-role='kai.workspace'] > .sf-section-head { min-height: 26px; }
+[data-role='kai.compact'] [data-role='kai.tile'] { width: 16px; height: 16px; line-height: 16px; border-radius: 4px; }
+[data-role='kai.compact'] [data-role='kai.view'],
+[data-role='kai.compact'] [data-role='kai.viewOn'] { height: 22px; }
+[data-role='kai.compact'] [data-role='kai.heading'] { padding: 4px 8px 0; }
+[data-role='kai.compact'] [data-role='kai.note'] { padding: 2px 8px; }
+
+[data-role='kai.spacious'] [data-role='kai.root'] { gap: 6px; }
+[data-role='kai.spacious'] [data-role='kai.header'] { height: 36px; }
+[data-role='kai.spacious'] [data-role='kai.host'] { margin-top: 8px; }
+[data-role='kai.spacious'] [data-role='kai.hostBody'],
+[data-role='kai.spacious'] [data-role='kai.list'],
+[data-role='kai.spacious'] [data-role='kai.indent'] { gap: 4px; }
+[data-role='kai.spacious'] [data-role='kai.workspace'] > .sf-section-body { gap: 4px; padding: 4px 0 8px; }
+[data-role='kai.spacious'] [data-role='kai.row'] > .sf-item,
+[data-role='kai.spacious'] [data-role='kai.rowFocused'] > .sf-item,
+[data-role='kai.spacious'] [data-role='kai.fileRow'],
+[data-role='kai.spacious'] [data-role='kai.refFold'],
+[data-role='kai.spacious'] [data-role='kai.drop'] { min-height: 32px; }
+[data-role='kai.spacious'] [data-role='kai.root'] .sf-section-head { min-height: 32px; }
+[data-role='kai.spacious'] [data-role='kai.root'] [data-role='kai.host'] > .sf-section-head { min-height: 30px; }
+[data-role='kai.spacious'] [data-role='kai.workspace'] > .sf-section-head { min-height: 36px; }
+[data-role='kai.spacious'] [data-role='kai.tile'] { width: 22px; height: 22px; line-height: 22px; border-radius: 6px; }
+[data-role='kai.spacious'] [data-role='kai.view'],
+[data-role='kai.spacious'] [data-role='kai.viewOn'] { height: 30px; }
+[data-role='kai.spacious'] [data-role='kai.heading'] { padding: 10px 8px 4px; }
+
+/* The dock at the bottom: Vitals for the machine the shown session runs on, laid out like a
+   sidebar's own copy: title and machine, the CPU figure with its level, a short equalizer, thin
+   meters. */
 [data-role='kai.vitalsSection'] {
-  padding: 4px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
   border-top: 1px solid var(--l2);
   background: var(--panel);
-  font-size: 0.8em;
-}
-[data-role='kai.vitalsSection'].medium { font-size: 0.9em; }
-[data-role='kai.vitalsSection'].wide { font-size: 1em; }
-[data-role='kai.vitalsSection'] .sf-section-body {
-  gap: 5px;
-  padding-top: 6px;
+  font-family: var(--sans);
 }
 [data-role='kai.vitalsHead'] {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
+  height: 24px;
   min-width: 0;
   overflow: hidden;
-  white-space: nowrap;
-}
-[data-role='kai.vitalsTitle'] {
-  flex: none;
-  white-space: nowrap;
-}
-[data-role='kai.vitalsHost'] {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 [data-role='kai.vitalsHead'] > .sf-icon {
   flex: none;
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
-[data-role='kai.vitalsDot'] {
+[data-role='kai.vitalsTitle'] {
   flex: none;
-  transform: scale(0.7);
-}
-[data-role='kai.vitalsHead'] .sf-badge {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--t1);
+  font-size: 0.96em;
+  font-weight: 600;
   white-space: nowrap;
 }
-[data-role='kai.vitalsHead'] > .sf-text:nth-of-type(2) {
+[data-role='kai.vitalsHost'] {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  min-width: 0;
+  margin-left: auto;
+  padding: 0 8px;
+  border: 1px solid var(--l2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+[data-role='kai.vitalsHost'] > .sf-icon {
+  flex: none;
+}
+[data-role='kai.vitalsHostName'] {
   min-width: 0;
   overflow: hidden;
+  color: var(--t1);
+  font-family: var(--mono);
+  font-size: 0.846em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 [data-role='kai.vitalsCpuRow'] {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 8px;
   min-width: 0;
   white-space: nowrap;
 }
+[data-role='kai.vitalsCpu'],
+[data-role='kai.vitalsCpuWarn'],
+[data-role='kai.vitalsCpuHot'] {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 2em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1.15;
+}
+[data-role='kai.vitalsCpu'] { color: var(--ok); }
+[data-role='kai.vitalsCpuWarn'] { color: var(--warn); }
+[data-role='kai.vitalsCpuHot'] { color: var(--bad); }
+[data-role='kai.vitalsCap'] {
+  flex: none;
+  color: var(--t3);
+  font-size: 0.81em;
+}
+[data-role='kai.vitalsChip'],
+[data-role='kai.vitalsChipWarn'],
+[data-role='kai.vitalsChipHot'] {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  min-width: 0;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+[data-role='kai.vitalsChip'] {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 15%, transparent);
+}
+[data-role='kai.vitalsChipWarn'] {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 15%, transparent);
+}
+[data-role='kai.vitalsChipHot'] {
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 15%, transparent);
+}
+[data-role='kai.vitalsChipDot'] {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+[data-role='kai.vitalsChipText'] {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.77em;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 [data-role='kai.vitalsEq'] {
   display: flex;
-  flex: 1 1 auto;
   align-items: flex-end;
-  gap: 2px;
-  height: 39px;
+  gap: 1px;
+  height: 40px;
   min-width: 0;
 }
 [data-role='kai.vitalsBand'] {
@@ -489,47 +617,26 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
 [data-role='kai.vitalsSeg'] {
   height: 3px;
   border-radius: 1px;
-  background: color-mix(in srgb, var(--t3) 14%, transparent);
+  background: color-mix(in srgb, var(--l3) 45%, transparent);
 }
 [data-role='kai.vitalsSeg'].on.vok { background: var(--ok); }
 [data-role='kai.vitalsSeg'].on.vwarn { background: var(--warn); }
 [data-role='kai.vitalsSeg'].on.vbad { background: var(--bad); }
 [data-role='kai.vitalsSeg'].peak { opacity: 0.4; }
-[data-role='kai.vitalsCpuSide'] {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: flex-end;
-  width: 3.6em;
-  gap: 1px;
-}
-[data-role='kai.vitalsCpu'] {
-  color: var(--ok);
-  font-family: var(--mono);
-  font-size: 1.8em;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  line-height: 1;
-}
-[data-role='kai.vitalsCpu'].warn { color: var(--warn); }
-[data-role='kai.vitalsCpu'].hot { color: var(--bad); }
-[data-role='kai.vitalsCap'] {
-  color: var(--t3);
-  font-size: 0.72em;
-}
 [data-role='kai.vitalsRow'] {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+  height: 16px;
   min-width: 0;
   white-space: nowrap;
 }
 [data-role='kai.vitalsLabel'] {
   flex: none;
-  width: 4em;
+  width: 48px;
   overflow: hidden;
   color: var(--t3);
-  font-size: 0.82em;
+  font-size: 0.81em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -537,9 +644,9 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
 [data-role='kai.vitalsValueWarn'],
 [data-role='kai.vitalsValueBad'] {
   flex: none;
-  width: 3em;
+  width: 30px;
   font-family: var(--mono);
-  font-size: 0.82em;
+  font-size: 0.81em;
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
@@ -549,23 +656,23 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
 [data-role='kai.vitalsValueBad'] { color: var(--bad); }
 [data-role='kai.vitalsMeter'] {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   align-items: center;
-  gap: 1px;
-  min-width: 3em;
-  height: 0.75em;
+  gap: 2px;
+  min-width: 0;
+  height: 7px;
 }
 [data-role='kai.vitalsMseg'] {
   flex: 1 1 0;
   min-width: 1px;
   height: 100%;
   border-radius: 1px;
-  background: color-mix(in srgb, var(--t3) 14%, transparent);
+  background: color-mix(in srgb, var(--l3) 45%, transparent);
 }
 [data-role='kai.vitalsMseg'].on.vok { background: var(--ok); }
 [data-role='kai.vitalsMseg'].on.vwarn { background: var(--warn); }
 [data-role='kai.vitalsMseg'].on.vbad { background: var(--bad); }
 [data-role='kai.vitalsNote'] {
   color: var(--t3);
-  font-size: 0.82em;
+  font-size: 0.846em;
 }
