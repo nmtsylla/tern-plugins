@@ -315,10 +315,10 @@ end
 
 
 local VIEWS = {
-	{ id = "agents", icon = "users", title = "Agents" },
-	{ id = "files", icon = "files", title = "Files" },
-	{ id = "changes", icon = "diff", title = "Changes" },
-	{ id = "refs", icon = "branch", title = "Refs" },
+	{ id = "agents", icon = "users", title = "Agents", short = "Agents" },
+	{ id = "files", icon = "files", title = "Files", short = "Files" },
+	{ id = "changes", icon = "diff", title = "Changes", short = "Diffs" },
+	{ id = "refs", icon = "branch", title = "Refs", short = "Refs" },
 }
 
 -- Each view's count, shown on its button so a card's state reads without opening it.
@@ -341,9 +341,13 @@ end
 local function viewBar(workspace)
 	local buttons = {}
 	for _, v in VIEWS do
-		local parts = { ui.node("icon", { key = "ic", name = v.icon }) }
+		local top = { ui.node("icon", { key = "ic", name = v.icon }) }
 		local count, tone = viewCount(workspace, v.id)
-		if count then table.insert(parts, ui.node("text", { key = "n", role = "kai.viewCount", tone = tone, text = count })) end
+		if count then table.insert(top, ui.node("text", { key = "n", role = "kai.viewCount", tone = tone, text = count })) end
+		local parts = {
+			ui.node("row", { key = "top", role = "kai.viewTop" }, top),
+			ui.node("text", { key = "label", role = "kai.viewLabel", text = v.short }),
+		}
 		table.insert(buttons, ui.node("row", {
 			key = v.id, title = v.title, aria = v.title, grow = 1,
 			role = if workspace.view == v.id then "kai.viewOn" else "kai.view",
