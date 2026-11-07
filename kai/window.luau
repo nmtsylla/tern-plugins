@@ -848,6 +848,12 @@ local function draw(cx)
 		local job = pendingDraw
 		pendingDraw = nil
 		if not c or not job then return end
+		-- The pane may have closed since the first half (reload, closed tab).
+		local alive = false
+		for _, canvas in c.canvas:list() do
+			if canvas.pane == job.pane then alive = true end
+		end
+		if not alive then return end
 		local ok, err = pcall(function()
 			c.canvas:set(job.pane, { view = view.render(job.data), dock = view.dock(job.data) })
 			rendered[job.pane] = job.signature
