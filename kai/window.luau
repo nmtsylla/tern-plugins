@@ -1003,7 +1003,7 @@ local function sync_widths(cx, except)
 	for tab, pane in byTab do
 		if tab ~= except and not rebuilding[tab] then
 			local r = leftShare(cx, tab, pane)
-			if r and math.abs(r - share) > 0.01 then pcall(sizeTo, cx, tab, pane, share) end
+			if r and math.abs(r - share) > 0.0005 then pcall(sizeTo, cx, tab, pane, share) end
 		end
 	end
 end
@@ -1095,7 +1095,7 @@ local function follow(cx, tab)
 		tern.kv.set("panel-share", share)
 		sync_widths(cx, tab)
 	end
-	if r and math.abs(r - share) > 0.01 then sizeTo(cx, tab, pane, share) else sized[tab] = r end
+	if r and math.abs(r - share) > 0.0005 then sizeTo(cx, tab, pane, share) else sized[tab] = r end
 end
 
 local function togglePanel(cx)
