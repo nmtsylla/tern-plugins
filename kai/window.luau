@@ -927,7 +927,7 @@ local function steer(cx, leaf, dir, want, measure, sign)
 	if not (want and r and leaf) then return end
 	local step = math.floor((want - r) * 150 + 0.5)
 	for _ = 1, 8 do
-		if math.abs(r - want) < 0.0015 or step == 0 then return end
+		if math.abs(r - want) < 0.0003 or step == 0 then return end
 		cx.layout:resize(leaf, dir, sign * step)
 		local after = measure()
 		if not after or after == r then return end
