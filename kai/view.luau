@@ -767,6 +767,128 @@ local function sizeMenu(model, menu)
 	return menu
 end
 
+
+-- ── vitals ────────────────────────────────────────────────────────────────
+
+local function vbytes_of(a, b)
+	a, b = tonumber(a) or 0, tonumber(b) or 0
+	if b <= 0 then return "" end
+	local units = { "B", "KB", "MB", "GB", "TB" }
+	local ia, ib, aa, bb = 1, 1, a, b
+	while bb >= 1000 and ib < #units do aa, bb, ia, ib = aa / 1000, bb / 1000, ia + 1, ib + 1 end
+	while aa >= 1000 and ia < #units do aa, ia = aa / 1000, ia + 1 end
+	local function one(v) return if v >= 10 then string.format("%.0f", v) else string.format("%.1f", v) end
+	return if ia == ib then one(aa) .. " of " .. one(bb) .. " " .. units[ib]
+		else one(aa) .. " " .. units[ia] .. " of " .. one(bb) .. " " .. units[ib]
+end
+
+local function vpct(value)
+	return string.format("%d%%", math.floor((tonumber(value) or 0) + 0.5))
+end
+
+local function vlevel_text(level, why)
+	if level == nil or level == "ok" then return "OK" end
+	return string.upper(level) .. (if why and why ~= "" then " " .. why else "")
+end
+
+local function vitals_meter(value)
+	local count = 18
+	local lit = math.floor(math.max(0, math.min(100, tonumber(value) or 0)) / 100 * count + 0.5)
+	local segs = {}
+	for i = 1, count do
+		local tone = if i >= count * 0.9 then "vbad" elseif i >= count * 0.8 then "vwarn" else "vok"
+		segs[#segs + 1] = ui.el("div", {
+			key = "m" .. tostring(i),
+			class = "vitalsMseg" .. if i <= lit then " on " .. tone else "",
+			role = "kai.vitalsMseg",
+		})
+	end
+	return ui.el("div", { key = "meter", class = "vitalsMeter", role = "kai.vitalsMeter" }, segs)
+end
+
+local function vitals_equalizer(reading)
+	local bands = (reading and reading.bands) or {}
+	local peaks = (reading and reading.peaks) or {}
+	local n = #bands
+	if n == 0 then n = 24 end
+	local rows = {}
+	for b = 1, n do
+		local value = bands[b]
+		local lit = if value == nil then 0 else math.floor(math.max(0, math.min(100, value)) / 100 * 16 + 0.5)
+		local peak = (peaks[b] and peaks[b].at) or 0
+		local segs = {}
+		for s = 0, 15 do
+			local on = s < lit
+			local cap = not on and peak > 0 and s == peak - 1
+			local tone = if on or cap then (s >= 14 and "vbad" or s >= 10 and "vwarn" or "vok") else ""
+			segs[#segs + 1] = ui.el("div", {
+				key = "s" .. tostring(s),
+				class = "vitalsSeg" .. if on then " on " .. tone else if cap then " peak " .. tone else "",
+				role = "kai.vitalsSeg",
+			})
+		end
+		rows[#rows + 1] = ui.el("div", { key = "b" .. tostring(b), class = "vitalsBand", role = "kai.vitalsBand" }, segs)
+	end
+	return ui.el("div", { key = "eq", class = "vitalsEq", role = "kai.vitalsEq" }, rows)
+end
+
+local function vitals_row(key, label, value, text, sub)
+	local children = {
+		ui.node("text", { key = "label", role = "kai.vitalsLabel", text = label, tone = "muted" }),
+		vitals_meter(value),
+		ui.node("text", { key = "value", role = "kai.vitalsValue", text = if text then vpct(value) else "" }),
+	}
+	if sub and sub ~= "" then
+		children[#children + 1] = ui.node("text", { key = "sub", role = "kai.vitalsSub", text = sub, tone = "muted" })
+	end
+	return ui.node("row", { key = key, class = "vitalsRow", role = "kai.vitalsRow" }, children)
+end
+
+local function vitals_section(v, open)
+	if not v then return nil end
+	local level = v.level or "ok"
+	local tone = if level == "hot" then "error" elseif level == "warn" then "warning" else "success"
+	local head_children = {
+		ui.node("icon", { key = "ic", name = "activity", tone = "accent" }),
+		ui.node("text", { key = "title", text = "VITALS", tone = "muted" }),
+		ui.node("text", { key = "host", text = v.host or "this computer", tone = "muted", grow = 1 }),
+	}
+	if v.reading then
+		head_children[#head_children + 1] = ui.node("badge", { key = "badge", text = vlevel_text(level, v.why), tone = tone })
+	end
+	local head = ui.node("row", { key = "head", class = "vitalsHead", role = "kai.vitalsHead" }, head_children)
+	local body = { head }
+	if v.error then
+		body[#body + 1] = ui.node("text", { key = "error", role = "kai.vitalsNote", text = v.error, tone = "error" })
+	elseif not v.reading then
+		body[#body + 1] = ui.node("text", { key = "reading", role = "kai.vitalsNote", text = "Reading…", tone = "muted" })
+	else
+		local r = v.reading
+		local used, size = 0, 0
+		for _, d in ipairs(r.disks or {}) do used, size = used + d.used, size + d.size end
+		local tone = if r.cpu >= 90 then "hot" elseif r.cpu >= 80 then "warn" else "ok"
+		body[#body + 1] = ui.node("row", { key = "cpurow", class = "vitalsCpuRow", role = "kai.vitalsCpuRow" }, {
+			vitals_equalizer(r),
+			ui.node("col", { key = "side", class = "vitalsCpuSide", role = "kai.vitalsCpuSide" }, {
+				ui.node("text", { key = "num", class = "vitalsCpu " .. tone, role = "kai.vitalsCpu",
+					text = if r.warming then "–" else tostring(math.floor(r.cpu + 0.5)) }),
+				ui.node("text", { key = "cap", role = "kai.vitalsCap", text = "% busy", tone = "muted" }),
+			}),
+		})
+		body[#body + 1] = vitals_row("mem", "Memory", r.mem, true, vbytes_of(r.memUsed, r.memTotal))
+		if size > 0 then
+			body[#body + 1] = vitals_row("disk", "Disk", 100 * used / size, true, vbytes_of(used, size))
+		end
+	end
+	return ui.node("section", {
+		key = "vitals",
+		head = ROOT .. "vitals.head",
+		collapsible = true,
+		collapsed = not open,
+		role = "kai.vitalsSection",
+	}, body)
+end
+
 function View.render(model)
 	mv = model.moving
 	refOpen = model.refOpen or {}
@@ -819,6 +941,7 @@ function View.render(model)
 		end
 	end
 	if slotAt(src, #model.workspaces + 1) then table.insert(children, dropSlot("dend", 0)) end
+	if model.vitals then table.insert(children, vitals_section(model.vitals, model.vitalsOpen ~= false)) end
 	if model.version then
 		table.insert(children, ui.node("text", { key = "version", role = "kai.version",
 			spans = { ui.span("Kai " .. model.version, "muted") } }))

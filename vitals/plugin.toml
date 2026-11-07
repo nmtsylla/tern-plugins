@@ -1,8 +1,0 @@
-schema = 1
-id = "tern-vitals"
-name = "Vitals"
-version = "0.1.0"
-description = "How the machine your agents run on is doing: CPU as an equalizer, memory, swap, load, network and disks, live, for this computer and every Tern host."
-icon = "activity"
-window = "window.luau"
-styles = ["styles.css"]

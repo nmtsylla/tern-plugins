@@ -382,3 +382,136 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
 [data-role='kai.refFold']:hover {
   background: color-mix(in srgb, black 14%, transparent);
 }
+
+/* Vitals: the machine the shown session runs on, at the bottom of the sidebar.
+   Compact by design: the equalizer, memory and every disk, no second panel. */
+[data-role='kai.vitalsSection'] .sf-section-body {
+  gap: 7px;
+  padding-top: 8px;
+}
+[data-role='kai.vitalsHead'] {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+[data-role='kai.vitalsHead'] > .sf-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+[data-role='kai.vitalsHead'] .sf-badge {
+  flex: none;
+}
+[data-role='kai.vitalsHead'] > .sf-text:nth-of-type(2) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-role='kai.vitalsCpuRow'] {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+[data-role='kai.vitalsEq'] {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-end;
+  gap: 2px;
+  height: 79px;
+  min-width: 0;
+}
+[data-role='kai.vitalsBand'] {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column-reverse;
+  gap: 1px;
+  min-width: 0;
+}
+[data-role='kai.vitalsSeg'] {
+  height: 4px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--t3) 14%, transparent);
+}
+[data-role='kai.vitalsSeg'].on.vok { background: var(--ok); }
+[data-role='kai.vitalsSeg'].on.vwarn { background: var(--warn); }
+[data-role='kai.vitalsSeg'].on.vbad { background: var(--bad); }
+[data-role='kai.vitalsSeg'].peak { opacity: 0.4; }
+[data-role='kai.vitalsCpuSide'] {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  width: 42px;
+  gap: 1px;
+}
+[data-role='kai.vitalsCpu'] {
+  color: var(--ok);
+  font-family: var(--mono);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1;
+}
+[data-role='kai.vitalsCpu'].warn { color: var(--warn); }
+[data-role='kai.vitalsCpu'].hot { color: var(--bad); }
+[data-role='kai.vitalsCap'] {
+  color: var(--t3);
+  font-size: 9.5px;
+}
+[data-role='kai.vitalsRow'] {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+[data-role='kai.vitalsLabel'] {
+  flex: none;
+  width: 46px;
+  overflow: hidden;
+  color: var(--t3);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-role='kai.vitalsValue'] {
+  flex: none;
+  width: 34px;
+  color: var(--t1);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+[data-role='kai.vitalsSub'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--t3);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-role='kai.vitalsMeter'] {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1px;
+  height: 9px;
+}
+[data-role='kai.vitalsMseg'] {
+  width: 3px;
+  height: 100%;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--t3) 14%, transparent);
+}
+[data-role='kai.vitalsMseg'].on.vok { background: var(--ok); }
+[data-role='kai.vitalsMseg'].on.vwarn { background: var(--warn); }
+[data-role='kai.vitalsMseg'].on.vbad { background: var(--bad); }
+[data-role='kai.vitalsNote'] {
+  color: var(--t3);
+  font-size: 10.5px;
+}

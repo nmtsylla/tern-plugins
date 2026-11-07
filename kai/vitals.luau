@@ -1,43 +1,22 @@
 --!nonstrict
--- Vitals: a live panel for the machine a Tern session runs on. The probe is
--- one small POSIX shell script (probe.sh), local or over ssh; the arithmetic
--- and the drawing live here and in view.luau.
-local view = require("./view")
+-- Vitals for Kai: one probe round for the machine the shown session runs on,
+-- parsed into the numbers the sidebar's Vitals section draws. The probe is
+-- POSIX shell, local or over ssh; no program is installed on a host.
 
-local TITLE = "Vitals"
-local ABOUT = "How the machine is doing: CPU, memory, swap, load, network and disks, live."
 local MAX_POINTS = 180
 local MAX_BANDS = 24
 local SEGMENTS = 16
 local PEAK_HOLD = 2
+local EVERY_MS = 2000
 
+local Vitals = {}
 local PROBE = tern.fs.read("probe.sh")
-local OS = tern.runtime.os
-local WINDOWS = OS == "windows"
+local WINDOWS = tern.runtime.os == "windows"
 
 local state = {
-	host = "local",
-	compact = tern.kv.get("compact") == true,
-	interval = tonumber(tern.kv.get("interval")) or 2000,
-	machines = false,
-	settings = false,
-	readings = {},
-	history = {},
-	peaks = {},
-	prev = {},
-	error = {},
-	last = {},
-	inflight = {},
-	saves = {},
+	history = {}, peaks = {}, prev = {}, reading = {}, error = {},
+	last = {}, inflight = {}, saves = {}, key = nil,
 }
-
-local lastFocus
-local later
-local restart_tick
-local lastTick = tern.now()
-local timersDead = false
-local tickGen = 0
-local drawQueued = false
 
 local function trim(text)
 	return (tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", ""))
@@ -408,7 +387,7 @@ end
 local function history_of(key)
 	local points = state.history[key]
 	if not points then
-		local stored = tern.kv.get("history:" .. key)
+		local stored = tern.kv.get("vitals-history:" .. key)
 		points = if type(stored) == "table" then stored else {}
 		for i = #points, 1, -1 do
 			local p = points[i]
@@ -420,7 +399,7 @@ local function history_of(key)
 end
 
 local function save_history(key)
-	tern.kv.set("history:" .. key, state.history[key] or {})
+	tern.kv.set("vitals-history:" .. key, state.history[key] or {})
 end
 
 local function bands_for(r, points)
@@ -483,102 +462,53 @@ local function record(r, key)
 	r.peaks = update_peaks(key, bands)
 end
 
--- ── machines ──────────────────────────────────────────────────────────────
 
-local function host_list(cx)
-	local out = { { key = "local", label = "This computer", kind = "local", state = "connected" } }
-	for _, host in ipairs(cx.hosts:list()) do
-		if host.kind == "remote" then
-			out[#out + 1] = {
-				key = "h" .. tostring(host.id),
-				label = host.name or host.address or ("Host " .. tostring(host.id)),
-				kind = "remote",
-				address = host.address,
-				state = host.state,
-			}
-		end
-	end
-	return out
+-- ── host and sampling ─────────────────────────────────────────────────────
+
+local function key_of(host)
+	if not host or host.kind == "local" then return "local" end
+	return "h" .. tostring(host.id)
 end
 
-local function host_by_key(cx, key)
-	for _, host in ipairs(host_list(cx)) do
-		if host.key == key then return host end
-	end
-	return host_list(cx)[1]
+local function host_label(host)
+	if not host or host.kind == "local" then return "this computer" end
+	return host.name or host.address or "remote"
 end
 
-local function panel(cx)
-	for _, canvas in ipairs(cx.canvas:list()) do
-		if canvas.owner == "tern-vitals" then return canvas.pane end
-	end
-	return nil
+local function host_address(host)
+	if type(host.address) ~= "string" or host.address == "" then return nil end
+	return host.address
 end
 
--- ── sampling ──────────────────────────────────────────────────────────────
-
-local function snapshot(cx)
-	local key = state.host
-	return {
-		host = host_by_key(cx, key),
-		hosts = host_list(cx),
-		reading = state.readings[key],
-		history = history_of(key),
-		compact = state.compact,
-		settings = state.settings,
-		machines = state.machines,
-		error = state.error[key],
-		interval = state.interval,
-	}
-end
-
-local function draw(cx)
-	local pane = panel(cx)
-	if not pane then return end
-	local ok, err = pcall(function()
-		cx.canvas:set(pane, { view = view.render(snapshot(cx)) })
-	end)
-	if not ok then tern.log.warn("vitals: " .. tostring(err)) end
-end
-
-local function redraw(cx)
-	if drawQueued then return end
-	drawQueued = true
-	later(0, function(c)
-		drawQueued = false
-		if c then draw(c) end
-	end)
-end
-
-local function sample(cx, key)
-	if state.inflight[key] then return end
-	local host = host_by_key(cx, key)
+local function run(cx, host, key, done)
 	if WINDOWS then
 		state.error[key] = "Vitals reads macOS and Linux hosts."
-		redraw(cx)
+		done()
 		return
 	end
 	local argv, opts
 	if host.kind == "local" then
 		argv = { "/bin/sh", "-c", PROBE }
 		opts = { timeout_ms = 8000 }
-	elseif type(host.address) == "string" and host.address ~= "" then
-		local endpoint, port = host.address:match("^(.-):(%d+)$")
+	else
+		local address = host_address(host)
+		if not address then
+			state.error[key] = "This host has no ssh address yet."
+			done()
+			return
+		end
+		local endpoint, port = address:match("^(.-):(%d+)$")
 		argv = { "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=4", "-o", "ServerAliveInterval=5" }
 		if port then
 			argv[#argv + 1] = "-p"
 			argv[#argv + 1] = port
 			argv[#argv + 1] = endpoint
 		else
-			argv[#argv + 1] = host.address
+			argv[#argv + 1] = address
 		end
 		argv[#argv + 1] = "sh"
 		argv[#argv + 1] = "-s"
 		opts = { stdin = PROBE, timeout_ms = 12000 }
-	else
-		state.error[key] = "This host has no ssh address yet."
-		redraw(cx)
-		return
 	end
 	state.inflight[key] = true
 	local ok, err = pcall(tern.process.run, argv, opts, function(result, c)
@@ -589,235 +519,58 @@ local function sample(cx, key)
 			if result.timed_out then message = "Timed out reading the machine." end
 			if message == "" then message = "Could not read the machine (exit " .. tostring(result.status) .. ")." end
 			state.error[key] = message
-			redraw(c)
+			done()
 			return
 		end
 		local parsed_ok, reading = pcall(parse, result.stdout, key)
 		if not parsed_ok then
 			state.error[key] = tostring(reading)
-			redraw(c)
+			done()
 			return
 		end
 		state.error[key] = nil
-		state.readings[key] = reading
-		state.last[key] = tern.now()
+		state.reading[key] = reading
 		record(reading, key)
-		redraw(c)
+		done()
 	end)
 	if not ok then
 		state.inflight[key] = false
 		state.error[key] = tostring(err)
-		redraw(cx)
+		done()
 	end
 end
 
--- ── timers ────────────────────────────────────────────────────────────────
-
-local function check_timers()
-	if timersDead or tern.now() - lastTick < 8000 then return false end
-	timersDead = true
-	tern.log.warn("vitals: Tern disabled this plugin's timers; deferring through processes")
-	if restart_tick then restart_tick() end
-	return true
-end
-
-later = function(ms, fn)
-	check_timers()
-	if timersDead then
-		local argv = if WINDOWS then { "powershell.exe", "-NoProfile", "-Command", "Start-Sleep -Milliseconds " .. tostring(math.floor(ms)) }
-			else { "/bin/sleep", string.format("%.3f", ms / 1000) }
-		pcall(tern.process.run, argv, { timeout_ms = ms + 5000 }, function(_result, cx) fn(cx) end)
-	else
-		tern.timer(ms, fn)
+-- Called from Kai's own 750 ms tick: reads the current host when its reading is due.
+function Vitals.tick(cx, done)
+	local ok, host = pcall(function() return cx.hosts:current() end)
+	if not ok or not host then return end
+	local key = key_of(host)
+	if state.key ~= key then
+		state.key = key
+		state.last[key] = nil
 	end
+	local last = state.last[key]
+	if state.inflight[key] or (last and tern.now() - last < EVERY_MS) then return end
+	state.last[key] = tern.now()
+	run(cx, host, key, done)
 end
 
-local function tick(gen, cx)
-	if not cx or gen ~= tickGen then return end
-	lastTick = tern.now()
-	local pane = panel(cx)
-	if pane and not state.inflight[state.host] then
-		local last = state.last[state.host]
-		if not last or tern.now() - last >= state.interval then sample(cx, state.host) end
-	end
-	later(state.interval, function(c) tick(gen, c) end)
+-- The section's model; cheap enough for Kai's 750 ms draw.
+function Vitals.model(cx)
+	local ok, host = pcall(function() return cx.hosts:current() end)
+	if not ok or not host then return nil end
+	local key = key_of(host)
+	local points = history_of(key)
+	local reading = state.reading[key]
+	return {
+		host = host_label(host),
+		remote = host.kind ~= "local",
+		reading = reading,
+		history = points,
+		error = state.error[key],
+		level = reading and reading.level or nil,
+		why = reading and reading.why or "",
+	}
 end
 
-restart_tick = function()
-	lastTick = tern.now()
-	tickGen += 1
-	local gen = tickGen
-	drawQueued = false
-	later(0, function(cx) tick(gen, cx) end)
-end
-
--- ── panel lifecycle ───────────────────────────────────────────────────────
-
-local function focus_back(cx)
-	if lastFocus and cx.session:pane(lastFocus) then cx.layout:focus(lastFocus) end
-end
-
-local function open_panel(cx)
-	lastFocus = cx.session:focused()
-	local pane, err = cx.canvas:open({
-		title = TITLE,
-		about = ABOUT,
-		view = tern.ui.text({ tern.ui.span("Reading…", "muted") }),
-		how = "beside",
-		focus = false,
-		ratio = 0.34,
-	})
-	if not pane then
-		cx:toast("error", "Vitals", err or "Could not open the panel")
-		return
-	end
-	sample(cx, state.host)
-	redraw(cx)
-end
-
-local function toggle(cx)
-	local pane = panel(cx)
-	if pane then
-		cx.layout:close(pane)
-		focus_back(cx)
-	else
-		open_panel(cx)
-	end
-end
-
-local function add_machine(cx)
-	local ok, list = pcall(function() return cx.actions:list("Add remote host") end)
-	if ok and type(list) == "table" and list[1] then
-		if pcall(function() cx.actions:run(list[1].id) end) then return end
-	end
-	pcall(function() cx:command("add_remote_host") end)
-end
-
-local function toggle_settings(cx)
-	state.settings = not state.settings
-	if not panel(cx) then open_panel(cx) end
-	redraw(cx)
-end
-
-local function choose_host(cx, key)
-	state.host = key
-	tern.kv.set("host", key)
-	if not state.readings[key] and not state.inflight[key] then sample(cx, key) end
-	redraw(cx)
-end
-
-local function step_host(cx, delta)
-	local list = host_list(cx)
-	local index = 1
-	for i, host in ipairs(list) do
-		if host.key == state.host then index = i end
-	end
-	local next = ((index - 1 + delta) % #list) + 1
-	choose_host(cx, list[next].key)
-end
-
--- ── events and commands ───────────────────────────────────────────────────
-
-tern.command({
-	id = "toggle",
-	title = "Vitals: show or hide",
-	icon = "activity",
-	keys = { "cmd+alt+v" },
-	run = toggle,
-})
-
-tern.command({
-	id = "settings",
-	title = "Vitals: settings",
-	icon = "gear",
-	run = toggle_settings,
-})
-
-tern.command({
-	id = "add-machine",
-	title = "Vitals: add machine",
-	icon = "plus",
-	run = function(cx) add_machine(cx) end,
-})
-
-tern.command({
-	id = "next",
-	title = "Vitals: next machine",
-	icon = "server",
-	run = function(cx) step_host(cx, 1) end,
-})
-
-tern.command({
-	id = "prev",
-	title = "Vitals: previous machine",
-	icon = "server",
-	run = function(cx) step_host(cx, -1) end,
-})
-
-tern.command({
-	id = "compact",
-	title = "Vitals: compact or full",
-	icon = "monitor",
-	run = function(cx)
-		state.compact = not state.compact
-		tern.kv.set("compact", state.compact)
-		redraw(cx)
-	end,
-})
-
-tern.on("canvas_action", function(ev, cx)
-	if ev.owner ~= "tern-vitals" then return nil end
-	local act, value = ev.act, ev.value
-	if value == nil then
-		act, value = string.match(tostring(ev.act or ""), "^([^=]+)=?(.*)$")
-		if value == "" then value = nil end
-	end
-	if act == "machines" then
-		state.machines = not state.machines
-	elseif act == "machine" and value then
-		state.machines = false
-		choose_host(cx, value)
-	elseif act == "compact" then
-		state.compact = not state.compact
-		tern.kv.set("compact", state.compact)
-	elseif act == "settings" then
-		state.settings = not state.settings
-	elseif act == "interval" then
-		local choices = { 2000, 5000, 10000 }
-		local index = 1
-		for i, ms in ipairs(choices) do
-			if state.interval == ms then index = i end
-		end
-		state.interval = choices[(index % #choices) + 1]
-		tern.kv.set("interval", state.interval)
-	elseif act == "reset-history" then
-		state.history[state.host] = {}
-		state.peaks[state.host] = {}
-		tern.kv.set("history:" .. state.host, nil)
-	elseif act == "add-machine" then
-		focus_back(cx)
-		add_machine(cx)
-		return true
-	elseif act == "close" then
-		local pane = panel(cx)
-		if pane then cx.layout:close(pane) end
-		focus_back(cx)
-	else
-		return false
-	end
-	focus_back(cx)
-	redraw(cx)
-	return true
-end)
-
-tern.on("window_start", function(cx)
-	local saved = tern.kv.get("host")
-	if type(saved) == "string" then state.host = saved end
-	local known = false
-	for _, host in ipairs(host_list(cx)) do
-		if host.key == state.host then known = true end
-	end
-	if not known then state.host = "local" end
-	if panel(cx) then sample(cx, state.host) end
-	restart_tick()
-end)
+return Vitals

@@ -1,8 +1,8 @@
 schema = 1
 id = "kai"
 name = "Kai"
-version = "0.3.2"
-description = "Workspaces sidebar: every Tern session as a workspace, its tabs and panes nested, with live agent state."
+version = "0.4.0"
+description = "Workspaces sidebar: every Tern session as a workspace, its tabs and panes nested, with live agent state and the machine's vitals."
 icon = "sidebar"
 window = "window.luau"
 styles = ["styles.css"]

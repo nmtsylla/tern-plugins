@@ -1,6 +1,7 @@
 --!nonstrict
 -- Kai: every Tern session as a workspace, its tabs and panes nested, with agent state.
 local view = require("./view")
+local Vitals = require("./vitals")
 
 local TITLE = "Workspaces"
 local ABOUT = "Every Tern session as a workspace, with its tabs, panes and agent state."
@@ -813,6 +814,8 @@ local function model(cx)
 		size = if SIZE_IDS[tern.kv.get("size")] then tern.kv.get("size") else "standard",
 		version = VERSION,
 		refOpen = records("ref-open"),
+		vitals = Vitals.model(cx),
+		vitalsOpen = tern.kv.get("vitals-open") ~= false,
 	}
 end
 
@@ -1675,6 +1678,10 @@ end
 -- Fold state lives in Kai's store, not in each panel: a fold made in one tab shows in every tab.
 local function fold(value)
 	-- Refs folds carry their key (hex) and the wanted state: ref:<hex>:<1 open|0 closed>.
+	if value == "vitals" then
+		tern.kv.set("vitals-open", not (tern.kv.get("vitals-open") ~= false))
+		return
+	end
 	local refKey, refWant = string.match(value or "", "^ref:(%x+):([01])$")
 	if refKey then
 		local all = records("ref-open")
@@ -1863,6 +1870,8 @@ local function tick(gen, cx)
 				focusMiss = 0
 			end
 			follow(cx)
+			local vok, verr = pcall(Vitals.tick, cx, redraw)
+			if not vok and problem ~= tostring(verr) then report(cx, verr) end
 			redraw()
 		end)
 		if not ok and problem ~= tostring(err) then report(cx, err) end

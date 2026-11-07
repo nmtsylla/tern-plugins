@@ -4,8 +4,7 @@ Plugins for [Tern](https://stencil.so/tern).
 
 | Plugin | What it does |
 | --- | --- |
-| [Kai](kai) | A workspaces sidebar: every session as a card with its agents, files, git changes and branches, plus live agent state |
-| [Vitals](vitals) | A live panel for the machine: CPU as an equalizer, memory, swap, load, network and disks, for this computer or any Tern host |
+| [Kai](kai) | A workspaces sidebar: every session as a card with its agents, files, git changes and branches, live agent state, and the machine's vitals at the bottom |
 
 ![Kai in a Tern window](kai/docs/images/hero.png)
 
@@ -26,7 +25,6 @@ Plugins for [Tern](https://stencil.so/tern).
 
 ```sh
 tern plugin install github.com/Yupmoh/tern-plugins/kai
-tern plugin install github.com/Yupmoh/tern-plugins/vitals
 ```
 
 Add `--force` to update an installed copy.
