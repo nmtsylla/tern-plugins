@@ -220,18 +220,17 @@
   padding: 6px 10px;
 }
 
-/* Workspace card: a faint raised surface with a hairline, no tree rule on the left. */
+/* Workspace card: no surface, border or padding; the host heading separates cards. */
 [data-role='kai.workspace'] {
-  padding: 4px;
-  border: 1px solid var(--l2);
-  border-radius: 12px;
-  background: color-mix(in srgb, black 7%, transparent);
+  padding: 0;
+  border: 0;
+  background: none;
 }
 [data-role='kai.workspace'] > .sf-section-body {
   box-shadow: none;
   margin-left: 0;
-  padding-left: 4px;
-  padding-right: 4px;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 /* Identity tile: the workspace's initial in its own color. */
