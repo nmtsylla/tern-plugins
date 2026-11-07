@@ -28,7 +28,7 @@ Optional: PR badges need the [GitHub CLI](https://cli.github.com) (`gh`) signed 
 - **Files:** the workspace folder as a tree, folders first and `.git` hidden, each file with an icon and color for its type. Changed files show their git letter and color, and folders holding changes are tinted. Click a folder to expand it, or a file to open it in Tern.
 - **Changes:** conflicts (red), unstaged (amber) and staged (green) sections. Each file is colored by its status: U untracked and A added in green, M modified in amber, D deleted in red, R renamed in blue. Right-click for Stage, Unstage, Open and Copy Path.
 - **Refs:** local branches (✓ current, ↑↓ against upstream) and remotes. Right-click a branch to check it out.
-- **Vitals:** at the bottom, the machine the shown session runs on: CPU as an equalizer, memory and every disk, with a health badge. It follows the current host, including remote hosts over the ssh access Tern already has. Click the VITALS header to fold it.
+- **Vitals:** pinned to the bottom, the machine the shown session runs on: CPU as an equalizer, memory and every disk, with a health badge. It follows the current host, including remote hosts over the ssh access Tern already has.
 
 ## Using it
 
@@ -64,7 +64,7 @@ Workspaces sit under one foldable header per machine (this one first, then each 
 
 ## How it works
 
-- `window.luau` holds the model (sessions, tabs, panes, agent state, git, files), the per-tab panel, clicks, menus and commands. `view.luau` turns the model into Tern-native nodes. `styles.css` only sets spacing and shading, scoped to `kai.*` roles. `vitals.luau` samples the current host (local or over ssh) every two seconds with `probe.sh`; its reading is part of the same model and canvas draw.
+- `window.luau` holds the model (sessions, tabs, panes, agent state, git, files), the per-tab panel, clicks, menus and commands. `view.luau` turns the model into Tern-native nodes. `styles.css` only sets spacing and shading, scoped to `kai.*` roles. `vitals.luau` samples the current host (local or over ssh) every two seconds with `probe.sh`; its reading is part of the same model and is drawn in the canvas dock, so it stays pinned while the workspaces scroll.
 - Tern has no window-level sidebar API, so each tab gets its own canvas pane as a full-height left column. A tab that is already split is rebuilt around it, keeping its shape and ratios. Only the visible tab's panel redraws; the others catch up when shown.
 - Tern gives each callback a 50 ms budget. Drawing runs in its own timer callback, git reads are asynchronous, and folder listings run in the background with a 10 s cache. If a stall (sleep, heavy load) makes Tern disable the plugin's timers, Kai notices and keeps working through process callbacks until the next reload.
 - Fold state, views, workspace order, icons, colors, the Ice Box, unseen marks and settings live in Tern's plugin storage.

@@ -573,17 +573,20 @@ end
 
 local SIZE_IDS = { compact = true, standard = true, spacious = true }
 
--- The version in plugin.toml, the one `tern plugin list` shows too (relative paths are the plugin dir).
-local VERSION = (function()
-	local ok, manifest = pcall(tern.fs.read, "plugin.toml")
-	return ok and manifest:match('\nversion%s*=%s*"([^"]+)"') or nil
-end)()
-
 local function model(cx)
-	local own = ours(cx)
+	local own, byTab = ours(cx)
 	local agents = {}
 	for _, agent in cx.agents:list() do agents[agent.pane] = agent end
 	local focused = cx.session:focused()
+	local panel = focused and byTab[cx.session:tab_of(focused)]
+	local panelShare = 0.22
+	if panel then
+		local layout = cx.session:layout(cx.session:tab_of(panel))
+		local root = layout and layout.root
+		if root and root.split == "right" and root[1] and root[1].pane == panel and root.ratio then
+			panelShare = root.ratio
+		end
+	end
 
 	local panesByTab = {}
 	for _, pane in cx.session:panes() do
@@ -812,10 +815,9 @@ local function model(cx)
 		workspaces = workspaces, moving = moving, filter = filter, hosts = hostRows,
 		iceCount = iceCount, showIce = showIce, sound = tern.kv.get("sound") == true,
 		size = if SIZE_IDS[tern.kv.get("size")] then tern.kv.get("size") else "standard",
-		version = VERSION,
 		refOpen = records("ref-open"),
 		vitals = Vitals.model(cx),
-		vitalsOpen = tern.kv.get("vitals-open") ~= false,
+		vitalsShare = panelShare,
 	}
 end
 
@@ -847,7 +849,7 @@ local function draw(cx)
 		pendingDraw = nil
 		if not c or not job then return end
 		local ok, err = pcall(function()
-			c.canvas:set(job.pane, { view = view.render(job.data) })
+			c.canvas:set(job.pane, { view = view.render(job.data), dock = view.dock(job.data) })
 			rendered[job.pane] = job.signature
 		end)
 		if not ok and problem ~= tostring(err) then report(c, err) end
@@ -1678,10 +1680,6 @@ end
 -- Fold state lives in Kai's store, not in each panel: a fold made in one tab shows in every tab.
 local function fold(value)
 	-- Refs folds carry their key (hex) and the wanted state: ref:<hex>:<1 open|0 closed>.
-	if value == "vitals" then
-		tern.kv.set("vitals-open", not (tern.kv.get("vitals-open") ~= false))
-		return
-	end
 	local refKey, refWant = string.match(value or "", "^ref:(%x+):([01])$")
 	if refKey then
 		local all = records("ref-open")

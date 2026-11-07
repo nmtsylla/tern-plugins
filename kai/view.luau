@@ -770,18 +770,6 @@ end
 
 -- ── vitals ────────────────────────────────────────────────────────────────
 
-local function vbytes_of(a, b)
-	a, b = tonumber(a) or 0, tonumber(b) or 0
-	if b <= 0 then return "" end
-	local units = { "B", "KB", "MB", "GB", "TB" }
-	local ia, ib, aa, bb = 1, 1, a, b
-	while bb >= 1000 and ib < #units do aa, bb, ia, ib = aa / 1000, bb / 1000, ia + 1, ib + 1 end
-	while aa >= 1000 and ia < #units do aa, ia = aa / 1000, ia + 1 end
-	local function one(v) return if v >= 10 then string.format("%.0f", v) else string.format("%.1f", v) end
-	return if ia == ib then one(aa) .. " of " .. one(bb) .. " " .. units[ib]
-		else one(aa) .. " " .. units[ia] .. " of " .. one(bb) .. " " .. units[ib]
-end
-
 local function vpct(value)
 	return string.format("%d%%", math.floor((tonumber(value) or 0) + 0.5))
 end
@@ -832,26 +820,23 @@ local function vitals_equalizer(reading)
 	return ui.el("div", { key = "eq", class = "vitalsEq", role = "kai.vitalsEq" }, rows)
 end
 
-local function vitals_row(key, label, value, text, sub)
-	local children = {
+local function vitals_row(key, label, value)
+	return ui.node("row", { key = key, role = "kai.vitalsRow" }, {
 		ui.node("text", { key = "label", role = "kai.vitalsLabel", text = label, tone = "muted" }),
 		vitals_meter(value),
-		ui.node("text", { key = "value", role = "kai.vitalsValue", text = if text then vpct(value) else "" }),
-	}
-	if sub and sub ~= "" then
-		children[#children + 1] = ui.node("text", { key = "sub", role = "kai.vitalsSub", text = sub, tone = "muted" })
-	end
-	return ui.node("row", { key = key, class = "vitalsRow", role = "kai.vitalsRow" }, children)
+		ui.node("text", { key = "value", role = "kai.vitalsValue", text = vpct(value) }),
+	})
 end
 
-local function vitals_section(v, open)
+local function vitals_node(v, share)
 	if not v then return nil end
+	local size = if not share or share < 0.16 then "narrow" elseif share < 0.23 then "medium" else "wide"
 	local level = v.level or "ok"
 	local tone = if level == "hot" then "error" elseif level == "warn" then "warning" else "success"
 	local head_children = {
 		ui.node("icon", { key = "ic", name = "activity", tone = "accent" }),
-		ui.node("text", { key = "title", text = "VITALS", tone = "muted" }),
-		ui.node("text", { key = "host", text = v.host or "this computer", tone = "muted", grow = 1 }),
+		ui.node("text", { key = "title", role = "kai.vitalsTitle", text = "VITALS", tone = "muted" }),
+		ui.node("text", { key = "host", role = "kai.vitalsHost", text = v.host or "this computer", tone = "muted", grow = 1 }),
 	}
 	if v.reading then
 		head_children[#head_children + 1] = ui.node("badge", { key = "badge", text = vlevel_text(level, v.why), tone = tone })
@@ -875,18 +860,16 @@ local function vitals_section(v, open)
 				ui.node("text", { key = "cap", role = "kai.vitalsCap", text = "% busy", tone = "muted" }),
 			}),
 		})
-		body[#body + 1] = vitals_row("mem", "Memory", r.mem, true, vbytes_of(r.memUsed, r.memTotal))
+		body[#body + 1] = vitals_row("mem", "Memory", r.mem)
 		if size > 0 then
-			body[#body + 1] = vitals_row("disk", "Disk", 100 * used / size, true, vbytes_of(used, size))
+			body[#body + 1] = vitals_row("disk", "Disk", 100 * used / size)
 		end
 	end
-	return ui.node("section", {
-		key = "vitals",
-		head = ROOT .. "vitals.head",
-		collapsible = true,
-		collapsed = not open,
-		role = "kai.vitalsSection",
-	}, body)
+	return ui.el("div", { key = "vitals", class = "vitalsSection " .. size, role = "kai.vitalsSection" }, body)
+end
+
+function View.dock(model)
+	return vitals_node(model.vitals, model.vitalsShare)
 end
 
 function View.render(model)
@@ -941,11 +924,6 @@ function View.render(model)
 		end
 	end
 	if slotAt(src, #model.workspaces + 1) then table.insert(children, dropSlot("dend", 0)) end
-	if model.vitals then table.insert(children, vitals_section(model.vitals, model.vitalsOpen ~= false)) end
-	if model.version then
-		table.insert(children, ui.node("text", { key = "version", role = "kai.version",
-			spans = { ui.span("Kai " .. model.version, "muted") } }))
-	end
 	-- The size wrapper only carries a role: styles.css tightens spacing beneath kai.compact/kai.standard.
 	return ui.node("col", { key = "s", role = "kai." .. model.size }, {
 		ui.node("col", { key = "kai", role = "kai.root" }, children),

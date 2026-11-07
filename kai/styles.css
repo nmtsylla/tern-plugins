@@ -363,13 +363,6 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
 [data-role='kai.compact'] [data-role='kai.heading'] { padding: 4px 6px 0; }
 [data-role='kai.compact'] [data-role='kai.note'] { padding: 2px 6px; }
 
-/* The installed version, quietly at the bottom of the list. */
-[data-role='kai.version'] {
-  padding: 4px 10px 2px;
-  font-size: 0.75em;
-  text-align: center;
-}
-
 /* Refs: Kai's own fold rows (Branches, Remotes, a remote, a branch folder). */
 [data-role='kai.refFold'] {
   align-items: center;
@@ -385,15 +378,37 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
 
 /* Vitals: the machine the shown session runs on, at the bottom of the sidebar.
    Compact by design: the equalizer, memory and every disk, no second panel. */
+[data-role='kai.vitalsSection'] {
+  padding: 4px 6px 8px;
+  border-top: 1px solid var(--l2);
+  background: var(--panel);
+  font-size: 0.8em;
+}
+[data-role='kai.vitalsSection'].medium { font-size: 0.9em; }
+[data-role='kai.vitalsSection'].wide { font-size: 1em; }
 [data-role='kai.vitalsSection'] .sf-section-body {
   gap: 7px;
   padding-top: 8px;
 }
 [data-role='kai.vitalsHead'] {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
   min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+[data-role='kai.vitalsTitle'] {
+  flex: none;
+  white-space: nowrap;
+}
+[data-role='kai.vitalsHost'] {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 [data-role='kai.vitalsHead'] > .sf-icon {
   flex: none;
@@ -401,7 +416,11 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
   height: 14px;
 }
 [data-role='kai.vitalsHead'] .sf-badge {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 [data-role='kai.vitalsHead'] > .sf-text:nth-of-type(2) {
   min-width: 0;
@@ -414,6 +433,7 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
   align-items: flex-end;
   gap: 8px;
   min-width: 0;
+  white-space: nowrap;
 }
 [data-role='kai.vitalsEq'] {
   display: flex;
@@ -444,13 +464,13 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
   flex: none;
   flex-direction: column;
   align-items: flex-end;
-  width: 42px;
+  width: 3.6em;
   gap: 1px;
 }
 [data-role='kai.vitalsCpu'] {
   color: var(--ok);
   font-family: var(--mono);
-  font-size: 22px;
+  font-size: 1.8em;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   line-height: 1;
@@ -459,51 +479,46 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
 [data-role='kai.vitalsCpu'].hot { color: var(--bad); }
 [data-role='kai.vitalsCap'] {
   color: var(--t3);
-  font-size: 9.5px;
+  font-size: 0.72em;
 }
 [data-role='kai.vitalsRow'] {
   display: flex;
   align-items: center;
   gap: 7px;
   min-width: 0;
+  white-space: nowrap;
 }
 [data-role='kai.vitalsLabel'] {
   flex: none;
-  width: 46px;
+  width: 4em;
   overflow: hidden;
   color: var(--t3);
-  font-size: 10.5px;
+  font-size: 0.82em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 [data-role='kai.vitalsValue'] {
   flex: none;
-  width: 34px;
+  width: 3em;
   color: var(--t1);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 0.82em;
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
 }
-[data-role='kai.vitalsSub'] {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--t3);
-  font-size: 9.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 [data-role='kai.vitalsMeter'] {
   display: flex;
-  flex: none;
+  flex: 1 1 auto;
   align-items: center;
   gap: 1px;
-  height: 9px;
+  min-width: 3em;
+  max-width: 7em;
+  height: 0.75em;
 }
 [data-role='kai.vitalsMseg'] {
-  width: 3px;
+  flex: 1 1 0;
+  min-width: 1px;
   height: 100%;
   border-radius: 1px;
   background: color-mix(in srgb, var(--t3) 14%, transparent);
@@ -513,5 +528,5 @@ row[data-role='kai.tile'], [data-role='kai.tile'].sf-row {
 [data-role='kai.vitalsMseg'].on.vbad { background: var(--bad); }
 [data-role='kai.vitalsNote'] {
   color: var(--t3);
-  font-size: 10.5px;
+  font-size: 0.82em;
 }
