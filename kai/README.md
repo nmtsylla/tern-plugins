@@ -23,7 +23,7 @@ Optional: PR badges need the [GitHub CLI](https://cli.github.com) (`gh`) signed 
   <img src="docs/images/changes.png" width="380" alt="Changes view">
 </p>
 
-- **Workspace card:** a colored tile (the initial, or an icon you pick), the name, a short path, Linear ticket and PR badges, and working or waiting pills. A folded card shows a one-line summary (`3 tabs · 1 working · main`). Cards only fold when you fold them.
+- **Workspace card:** a colored tile (the initial, or an icon you pick), the name, a short path, Linear ticket and PR badges. A host with one workspace puts its own dot and name in that card's head. A folded card shows a one-line summary (`3 tabs · 1 working · main`). Cards only fold when you fold them.
 - **Agents:** one row per pane. A single-pane tab is one row; a split tab is a foldable group. A spinner while an agent works, a pulsing dot while it waits for you, ✓ when it finished while you were elsewhere, ✗ when a command failed. The agent's last reply shows as a second line, and the model is in the tooltip.
 - **Files:** the workspace folder as a tree, folders first and `.git` hidden, each file with an icon and color for its type. Changed files show their git letter and color, and folders holding changes are tinted. Click a folder to expand it, or a file to open it in Tern.
 - **Changes:** conflicts (red), unstaged (amber) and staged (green) sections. Each file is colored by its status: U untracked and A added in green, M modified in amber, D deleted in red, R renamed in blue. Right-click for Stage, Unstage, Open and Copy Path.

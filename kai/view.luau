@@ -95,6 +95,15 @@ local KIND_ICONS = {
 	board = "kanban", canvas = "canvas", procs = "activity", screen = "monitor", profile = "gauge",
 	carly = "sparkle", plugin = "puzzle",
 }
+local HOST_STATE = {
+	connected = { tone = "success", text = nil },
+	connecting = { tone = "warning", text = "connecting" },
+	reconnecting = { tone = "warning", text = "reconnecting" },
+	stalled = { tone = "warning", text = "stalled" },
+	verify = { tone = "warning", text = "verify key" },
+	failed = { tone = "error", text = "failed" },
+}
+
 local STATE = {
 	waiting = { tone = "accent", value = "waiting", style = "accent" },
 	working = { tone = "success", value = "working", style = "success" },
@@ -165,8 +174,17 @@ local function rowRole(focused)
 	return if focused then "kai.rowFocused" else "kai.row"
 end
 
+-- A leading "TASK:" or "NVIM:" names the kind of row, not the work: show it muted so the
+-- title keeps the width instead of truncating behind it.
+local function labelSpans(label)
+	local text = tostring(label or "")
+	local prefix, rest = text:match("^([%u][%u%d_%-]-):%s+(.+)$")
+	if prefix then return { ui.span(prefix .. ":", "muted"), ui.span(" " .. rest) } end
+	return { ui.span(text) }
+end
+
 -- What sits at a row's right edge: Tern's own spinner while an agent works, a pulsing dot while
--- one waits for you, a short word for other states, nothing when idle at a shell.
+-- one waits for you, a short word for other states, a quiet dot when idle.
 local function indicator(pane)
 	if pane.unseen == "failed" then
 		return ui.node("icon", { key = "st", name = "x-circle", tone = "error", title = "Command failed while you were away" })
@@ -181,6 +199,10 @@ local function indicator(pane)
 	if look and look.value and pane.state ~= "idle" then
 		return ui.node("text", { key = "st", spans = { ui.span(look.value, look.style) } })
 	end
+	-- Idle shells and idle agents get the same quiet marker: state reads on every row.
+	if pane.state == "shell" or pane.state == "idle" then
+		return ui.el("div", { key = "st", role = "kai.idleDot", title = "Idle" })
+	end
 	return nil
 end
 
@@ -193,7 +215,7 @@ local function paneRow(workspace, pane, menu, key, label, pick, what, moved, col
 	local children = {
 		ui.node("item", {
 			key = "i", grow = 1,
-			label = label or pane.title,
+			label = labelSpans(label or pane.title),
 			detail = if pane.lastMessage then pane.lastMessage else (pane.program:match("^(%S+)") or pane.program),
 			icon = iconOf(pane),
 			tone = look.tone,
@@ -221,7 +243,8 @@ local function tabSection(workspace, wkey, tab)
 	if slotAt(src, #tab.panes + 1) then table.insert(items, dropSlot("dend", 0)) end
 
 	local look = STATE[tab.state or "none"] or STATE.none
-	local spans = { ui.span(tab.name), ui.span("  " .. tostring(#tab.panes), "muted") }
+	local spans = labelSpans(tab.name)
+	table.insert(spans, ui.span("  " .. tostring(#tab.panes), "muted"))
 	if tab.state == "waiting" or tab.state == "working" then
 		table.insert(spans, ui.span("  " .. tab.state, look.style))
 	end
@@ -247,10 +270,6 @@ local function tabSection(workspace, wkey, tab)
 	})
 end
 
-local function badge(key, text, tone, title)
-	return ui.node("badge", { key = key, text = text, tone = tone, title = title })
-end
-
 local TILE_TONES = { "accent", "info", "success", "warning", "error", "user" }
 View.TILE_TONES = TILE_TONES
 
@@ -273,11 +292,32 @@ local function plural(n, word)
 	return tostring(n) .. " " .. word .. (if n == 1 then "" else "s")
 end
 
+-- What a host heading can do, folded into the workspace card when that host holds only one.
+local function hostMenu(h)
+	local menu = { M.switchHost, M.newOnHost, M.addHost }
+	if h.remote then table.insert(menu, M.disconnectHost) end
+	return menu
+end
+
 -- The head is a child (drawn in the section's head row): tile, name over a short path (and a
--- one-line summary while folded), status pills at the right edge.
-local function workspaceHead(workspace)
+-- one-line summary while folded). A host with a single workspace carries its dot and name here
+-- instead of spending a second heading on it.
+local function workspaceHead(workspace, host)
+	local nameSpans = { ui.span(workspace.name, "strong") }
+	if host then
+		table.insert(nameSpans, ui.span("  " .. string.upper(host.name), "muted"))
+		local look = HOST_STATE[host.state] or HOST_STATE.connecting
+		if look.text then
+			table.insert(nameSpans, ui.span(" · " .. look.text, look.tone))
+		elseif host.remote and host.rtt then
+			table.insert(nameSpans, ui.span(" · " .. tostring(math.floor(host.rtt + 0.5)) .. " ms", "info"))
+		end
+	end
+	local title = if host
+		then host.name .. (if host.remote then " (remote)" else " (this machine)") .. (if host.error then "\n" .. host.error else "")
+		else nil
 	local lines = {
-		ui.node("text", { key = "name", spans = { ui.span(workspace.name, "strong") } }),
+		ui.node("text", { key = "name", spans = nameSpans, title = title }),
 		ui.node("text", { key = "path", spans = { ui.span(workspace.crumb, "muted") }, title = workspace.fullPath }),
 	}
 	if not workspace.open then
@@ -288,13 +328,10 @@ local function workspaceHead(workspace)
 		table.insert(lines, ui.node("text", { key = "sum", role = "kai.summary", spans = { ui.span(table.concat(bits, " · "), "muted") } }))
 	end
 	local children = { tile(workspace), ui.node("col", { key = "text", role = "kai.wsText", grow = 1, shrink = 1 }, lines) }
-	if workspace.open then
-		if workspace.waiting > 0 then
-			table.insert(children, badge("waiting", tostring(workspace.waiting) .. " waiting", "accent", "Agents waiting for you"))
-		end
-		if workspace.working > 0 then
-			table.insert(children, badge("working", tostring(workspace.working) .. " working", "success", "Agents working"))
-		end
+	if host then
+		local look = HOST_STATE[host.state] or HOST_STATE.connecting
+		table.insert(children, 1, ui.node("text", { key = "hdot", spans = { ui.span("●", look.tone) },
+			role = "kai.hostDot", title = host.name .. " · " .. (look.text or "connected") }))
 	end
 	if workspace.ticket then
 		table.insert(children, ui.node("badge", { key = "ticket", text = workspace.ticket, tone = "accent",
@@ -678,7 +715,7 @@ local function viewBody(workspace, wkey)
 	return refsBlock(workspace.branches, workspace.root)
 end
 
-local function workspaceSection(workspace)
+local function workspaceSection(workspace, host)
 	local key = "w" .. tostring(workspace.id) .. "_" .. tostring(workspace.gen)
 
 	-- Single-pane tabs are rows of one column; a tab with several panes is its own section.
@@ -706,40 +743,31 @@ local function workspaceSection(workspace)
 	flush()
 	if #body == 0 then table.insert(body, ui.text({ ui.span("No tabs", "muted") })) end
 	if workspace.view ~= "agents" then body = viewBody(workspace, key) end
-	table.insert(body, 1, viewBar(workspace))
-	table.insert(body, 1, workspaceHead(workspace))
+	-- Only the workspace you are in shows the view switch; the others keep their rows.
+	if workspace.current then table.insert(body, 1, viewBar(workspace)) end
+	table.insert(body, 1, workspaceHead(workspace, host))
 
 	local moved = mv and mv.kind == "ws" and mv.id == workspace.id
 	return ui.node("section", {
 		key = key,
 		head = parent .. key .. ".head", collapsible = true, collapsed = not workspace.open,
 		role = "kai.workspace", mark = if moved then "drop" else nil,
-		actions = { menu = View.workspaceMenu(workspace) },
+		actions = { menu = host and merged(View.workspaceMenu(workspace), hostMenu(host)) or View.workspaceMenu(workspace) },
 	}, body)
 end
 
-local HOST_STATE = {
-	connected = { tone = "success", text = nil },
-	connecting = { tone = "warning", text = "connecting" },
-	reconnecting = { tone = "warning", text = "reconnecting" },
-	stalled = { tone = "warning", text = "stalled" },
-	verify = { tone = "warning", text = "verify key" },
-	failed = { tone = "error", text = "failed" },
-}
 
-
--- A machine: a foldable section headed like the view labels (state dot, the host's own name,
--- latency or link state, workspace count, + to add a host), holding its workspaces.
+-- A machine with several workspaces: a foldable heading (state dot, the host's own name,
+-- latency or link state, + to add a host) over its workspace cards.
 local function hostSection(h, body)
 	local look = HOST_STATE[h.state] or HOST_STATE.connecting
 	local spans = { ui.span(string.upper(h.name), if h.current then nil else "muted") }
 	if look.text then
 		table.insert(spans, ui.span(" · " .. look.text, look.tone))
 	elseif h.remote and h.rtt then
-		table.insert(spans, ui.span(" · " .. tostring(math.floor(h.rtt + 0.5)) .. " ms", "muted"))
+		table.insert(spans, ui.span(" · " .. tostring(math.floor(h.rtt + 0.5)) .. " ms", "info"))
 	end
-	local menu = { M.switchHost, M.newOnHost, M.addHost }
-	if h.remote then table.insert(menu, M.disconnectHost) end
+	local menu = hostMenu(h)
 	local key = "h" .. tostring(h.id)
 	if #body == 0 then table.insert(body, note("none", "No sessions")) end
 	return ui.node("section", {
@@ -753,8 +781,7 @@ local function hostSection(h, body)
 			ui.node("text", { key = "dot", spans = { ui.span("●", look.tone) }, role = "kai.hostDot" }),
 			ui.node("text", { key = "name", spans = spans, grow = 1, role = "kai.hostName",
 				actions = { click = "host=" .. tostring(h.id) } }),
-			ui.node("text", { key = "n", text = tostring(h.count), tone = "muted" }),
-			ui.node("icon", { key = "add", name = "plus", tone = "muted", title = "Add remote host", aria = "Add remote host",
+			ui.node("icon", { key = "add", name = "plus", tone = "muted", title = "Add a remote host", aria = "Add a remote host",
 				actions = { click = "addhost" } }),
 		}),
 		ui.node("col", { key = "l", role = "kai.hostBody" }, body),
@@ -799,15 +826,17 @@ local function vitals_equalizer(reading)
 	local n = #bands
 	if n == 0 then n = 24 end
 	local rows = {}
+	local steps = 10
 	for b = 1, n do
 		local value = bands[b]
-		local lit = if value == nil then 0 else math.floor(math.max(0, math.min(100, value)) / 100 * 16 + 0.5)
+		local lit = if value == nil then 0 else math.floor(math.max(0, math.min(100, value)) / 100 * steps + 0.5)
 		local peak = (peaks[b] and peaks[b].at) or 0
+		local peakStep = if peak > 0 then math.min(steps, math.ceil(peak * steps / 16)) else 0
 		local segs = {}
-		for s = 0, 15 do
+		for s = 0, steps - 1 do
 			local on = s < lit
-			local cap = not on and peak > 0 and s == peak - 1
-			local tone = if on or cap then (s >= 14 and "vbad" or s >= 10 and "vwarn" or "vok") else ""
+			local cap = not on and peakStep > 0 and s == peakStep - 1
+			local tone = if on or cap then (s >= steps - 1 and "vbad" or s >= steps - 2 and "vwarn" or "vok") else ""
 			segs[#segs + 1] = ui.el("div", {
 				key = "s" .. tostring(s),
 				class = "vitalsSeg" .. if on then " on " .. tone else if cap then " peak " .. tone else "",
@@ -820,10 +849,12 @@ local function vitals_equalizer(reading)
 end
 
 local function vitals_row(key, label, value)
+	local n = tonumber(value) or 0
+	local role = if n >= 90 then "kai.vitalsValueBad" elseif n >= 80 then "kai.vitalsValueWarn" else "kai.vitalsValue"
 	return ui.node("row", { key = key, role = "kai.vitalsRow" }, {
 		ui.node("text", { key = "label", role = "kai.vitalsLabel", text = label, tone = "muted" }),
 		vitals_meter(value),
-		ui.node("text", { key = "value", role = "kai.vitalsValue", text = vpct(value) }),
+		ui.node("text", { key = "value", role = role, text = vpct(value) }),
 	})
 end
 
@@ -840,7 +871,8 @@ local function vitals_node(v, share)
 		ui.node("text", { key = "host", role = "kai.vitalsHost", text = host_text, tone = "muted", grow = 1 }),
 	}
 	if v.reading then
-		head_children[#head_children + 1] = ui.node("text", { key = "dot", spans = { ui.span("●", tone) }, role = "kai.vitalsDot" })
+		head_children[#head_children + 1] = ui.node("text", { key = "dot", spans = { ui.span("●", tone) },
+			role = "kai.vitalsDot", title = (v.why or "") ~= "" and string.upper(level) .. " " .. v.why or "All normal" })
 	end
 	local head = ui.node("row", { key = "head", class = "vitalsHead", role = "kai.vitalsHead" }, head_children)
 	local body = { head }
@@ -906,23 +938,29 @@ function View.render(model)
 		}))
 	end
 	local src = mv and mv.kind == "ws" and indexOf(model.workspaces, mv.id) or nil
+	local hostById, perHost = {}, {}
+	for _, h in model.hosts or {} do hostById[h.id], perHost[h.id] = h, 0 end
+	for _, workspace in ipairs(model.workspaces) do
+		if workspace.host and perHost[workspace.host] then perHost[workspace.host] += 1 end
+	end
 	-- Workspaces with their drop slots, into the host section they belong to (or the root).
+	-- A host with a single workspace keeps its dot and name in that card's own head instead.
 	local byHost, loose = {}, children
 	for i, workspace in ipairs(model.workspaces) do
+		local host = workspace.host and hostById[workspace.host]
+		local solo = host and perHost[host.id] == 1 and host or nil
 		local into = loose
-		if model.hosts and workspace.host ~= nil then
-			byHost[workspace.host] = byHost[workspace.host] or {}
-			into = byHost[workspace.host]
+		if host and not solo then
+			byHost[host.id] = byHost[host.id] or {}
+			into = byHost[host.id]
 		end
-		parent = if into == loose then ROOT else ROOT .. "h" .. tostring(workspace.host) .. ".l."
+		parent = if into == loose then ROOT else ROOT .. "h" .. tostring(host.id) .. ".l."
 		if slotAt(src, i) then table.insert(into, dropSlot("d" .. tostring(workspace.id), workspace.id)) end
-		table.insert(into, workspaceSection(workspace))
+		table.insert(into, workspaceSection(workspace, solo))
 	end
 	parent = ROOT
-	if model.hosts then
-		for _, h in model.hosts do
-			table.insert(children, hostSection(h, byHost[h.id] or {}))
-		end
+	for _, h in model.hosts or {} do
+		if (perHost[h.id] or 0) ~= 1 then table.insert(children, hostSection(h, byHost[h.id] or {})) end
 	end
 	if slotAt(src, #model.workspaces + 1) then table.insert(children, dropSlot("dend", 0)) end
 	-- The size wrapper only carries a role: styles.css tightens spacing beneath kai.compact/kai.standard.

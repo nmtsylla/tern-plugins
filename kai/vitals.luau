@@ -80,17 +80,21 @@ local function rank(level)
 	return 0
 end
 
+local function pct(value)
+	return string.format("%d%%", math.floor((tonumber(value) or 0) + 0.5))
+end
+
 local function assess(r)
 	local level, why = "ok", ""
 	local function worse(l, w)
 		if rank(l) > rank(level) then level, why = l, w end
 	end
-	worse(pct_level(r.cpu), "cpu")
-	worse(pct_level(r.mem), "memory")
-	if r.swapTotal > 0 and r.swap >= 50 then worse("warn", "swap") end
-	worse(load_level(r.loadPerCore), "load")
+	worse(pct_level(r.cpu), "cpu " .. pct(r.cpu))
+	worse(pct_level(r.mem), "memory " .. pct(r.mem))
+	if r.swapTotal > 0 and r.swap >= 50 then worse("warn", "swap " .. pct(r.swap)) end
+	worse(load_level(r.loadPerCore), "load " .. string.format("%.1f", r.loadPerCore or 0))
 	for _, disk in ipairs(r.disks or {}) do
-		worse(pct_level(disk.pct), disk_name(disk.mount))
+		worse(pct_level(disk.pct), disk_name(disk.mount) .. " " .. pct(disk.pct))
 	end
 	return level, why
 end
