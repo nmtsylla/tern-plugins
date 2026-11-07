@@ -927,7 +927,7 @@ local function steer(cx, leaf, dir, want, measure, sign)
 	if not (want and r and leaf) then return end
 	local step = math.floor((want - r) * 150 + 0.5)
 	for _ = 1, 8 do
-		if math.abs(r - want) < 0.006 or step == 0 then return end
+		if math.abs(r - want) < 0.0015 or step == 0 then return end
 		cx.layout:resize(leaf, dir, sign * step)
 		local after = measure()
 		if not after or after == r then return end
@@ -993,6 +993,19 @@ local function rebuild(cx, tab, pane)
 	expand(cx, tree)
 	if layout.focus and layout.focus ~= pane and cx.session:pane(layout.focus) then cx.layout:focus(layout.focus) end
 	return tree
+end
+
+
+-- Keep every tab's rail at the shared width. A switch then reveals a panel that is
+-- already the right size instead of resizing it after it shows.
+local function sync_widths(cx, except)
+	local _, byTab = ours(cx)
+	for tab, pane in byTab do
+		if tab ~= except and not rebuilding[tab] then
+			local r = leftShare(cx, tab, pane)
+			if r and math.abs(r - share) > 0.01 then pcall(sizeTo, cx, tab, pane, share) end
+		end
+	end
 end
 
 -- Makes the panel the tab's full-height left column; true once it is.
@@ -1080,6 +1093,7 @@ local function follow(cx, tab)
 	if r and sized[tab] and math.abs(r - sized[tab]) > 0.01 then
 		share = math.clamp(r, 0.1, 0.5)
 		tern.kv.set("panel-share", share)
+		sync_widths(cx, tab)
 	end
 	if r and math.abs(r - share) > 0.01 then sizeTo(cx, tab, pane, share) else sized[tab] = r end
 end
@@ -1846,6 +1860,7 @@ local function followAndDraw(cx, tab)
 	checkTimers()
 	local ok, err = pcall(follow, cx, tab)
 	if not ok then tern.log.warn("kai: " .. tostring(err)) end
+	pcall(sync_widths, cx)
 	redraw()
 end
 
