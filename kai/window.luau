@@ -919,19 +919,20 @@ local function leftShare(cx, tab, pane)
 end
 
 -- Steers a split's ratio by resizing a leaf on its divider: step, measure, correct.
--- Tern resizes in cells, so the cells-per-ratio factor is learned from the first step.
+-- Tern resizes by fractional cells, so a divider lands exactly where wanted, not on the cell grid;
+-- the cells-per-ratio factor is learned from the first step.
 -- `sign` is -1 when the leaf sits after the divider (growing it shrinks the ratio).
 local function steer(cx, leaf, dir, want, measure, sign)
 	sign = sign or 1
 	local r = measure()
 	if not (want and r and leaf) then return end
-	local step = math.floor((want - r) * 150 + 0.5)
+	local step = (want - r) * 200
 	for _ = 1, 8 do
-		if math.abs(r - want) < 0.0003 or step == 0 then return end
+		if math.abs(r - want) < 0.0001 or math.abs(step) < 0.001 then return end
 		cx.layout:resize(leaf, dir, sign * step)
 		local after = measure()
 		if not after or after == r then return end
-		step = math.floor((want - after) * step / (after - r) + 0.5)
+		step = (want - after) * step / (after - r)
 		r = after
 	end
 end
@@ -1003,7 +1004,7 @@ local function sync_widths(cx, except)
 	for tab, pane in byTab do
 		if tab ~= except and not rebuilding[tab] then
 			local r = leftShare(cx, tab, pane)
-			if r and math.abs(r - share) > 0.0005 then pcall(sizeTo, cx, tab, pane, share) end
+			if r and math.abs(r - share) > 0.0002 then pcall(sizeTo, cx, tab, pane, share) end
 		end
 	end
 end
@@ -1095,8 +1096,9 @@ local function follow(cx, tab)
 		tern.kv.set("panel-share", share)
 		sync_widths(cx, tab)
 	end
-	if r and math.abs(r - share) > 0.0005 then sizeTo(cx, tab, pane, share) else sized[tab] = r end
+	if r and math.abs(r - share) > 0.0002 then sizeTo(cx, tab, pane, share) else sized[tab] = r end
 end
+
 
 local function togglePanel(cx)
 	local own = ours(cx)
