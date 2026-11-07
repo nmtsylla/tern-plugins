@@ -778,11 +778,6 @@ local function vpct(value)
 	return string.format("%d%%", math.floor((tonumber(value) or 0) + 0.5))
 end
 
-local function vlevel_text(level, why)
-	if level == nil or level == "ok" then return "OK" end
-	return string.upper(level) .. (if why and why ~= "" then " " .. why else "")
-end
-
 local function vitals_meter(value)
 	local count = 18
 	local lit = math.floor(math.max(0, math.min(100, tonumber(value) or 0)) / 100 * count + 0.5)
@@ -837,13 +832,15 @@ local function vitals_node(v, share)
 	local size = if not share or share < 0.16 then "narrow" elseif share < 0.23 then "medium" else "wide"
 	local level = v.level or "ok"
 	local tone = if level == "hot" then "error" elseif level == "warn" then "warning" else "success"
+	local host_text = v.host or "this computer"
+	if level ~= "ok" and v.why and v.why ~= "" then host_text = host_text .. " · " .. v.why end
 	local head_children = {
 		ui.node("icon", { key = "ic", name = "activity", tone = "accent" }),
 		ui.node("text", { key = "title", role = "kai.vitalsTitle", text = "VITALS", tone = "muted" }),
-		ui.node("text", { key = "host", role = "kai.vitalsHost", text = v.host or "this computer", tone = "muted", grow = 1 }),
+		ui.node("text", { key = "host", role = "kai.vitalsHost", text = host_text, tone = "muted", grow = 1 }),
 	}
 	if v.reading then
-		head_children[#head_children + 1] = ui.node("badge", { key = "badge", text = vlevel_text(level, v.why), tone = tone })
+		head_children[#head_children + 1] = ui.node("text", { key = "dot", spans = { ui.span("●", tone) }, role = "kai.vitalsDot" })
 	end
 	local head = ui.node("row", { key = "head", class = "vitalsHead", role = "kai.vitalsHead" }, head_children)
 	local body = { head }
