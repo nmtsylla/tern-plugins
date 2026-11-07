@@ -617,7 +617,7 @@ local function model(cx)
 			id = session.id, name = session.name, current = session.id == current.id,
 			locked = session.locked, tabCount = #session.tabs, tabs = {}, waiting = 0, working = 0, unseen = 0,
 		}
-		local folder
+		local folder, focusedFolder
 		for _, tabId in session.tabs do
 			local info = tabsById[tabId]
 			local panes = panesByTab[tabId] or {}
@@ -633,7 +633,10 @@ local function model(cx)
 				if state == "waiting" then workspace.waiting += 1 end
 				if state == "working" then workspace.working += 1 end
 				if RANK[state] and (not best or RANK[state] > RANK[best]) then best = state end
-				if not folder and pane.cwd and pane.cwd ~= "" then folder = norm(pane.cwd) end
+				if pane.cwd and pane.cwd ~= "" then
+					if not folder then folder = norm(pane.cwd) end
+					if pane.pane == focused then focusedFolder = norm(pane.cwd) end
+				end
 				local prev = lastState[pane.pane]
 				lastState[pane.pane] = state
 				local label = paneTitle(pane, program)
@@ -672,7 +675,8 @@ local function model(cx)
 				table.insert(workspace.tabs, tab)
 			end
 		end
-		folder = folder or HOME
+		-- The folder follows where you are: the focused pane's, else the first pane's.
+		folder = focusedFolder or folder or HOME
 		workspace.fullPath = folder
 		workspace.path = tildePath(folder)
 		workspace.crumb = crumb(folder)
