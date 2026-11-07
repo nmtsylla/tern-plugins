@@ -1,0 +1,823 @@
+--!nonstrict
+-- Vitals: a live panel for the machine a Tern session runs on. The probe is
+-- one small POSIX shell script (probe.sh), local or over ssh; the arithmetic
+-- and the drawing live here and in view.luau.
+local view = require("./view")
+
+local TITLE = "Vitals"
+local ABOUT = "How the machine is doing: CPU, memory, swap, load, network and disks, live."
+local MAX_POINTS = 180
+local MAX_BANDS = 24
+local SEGMENTS = 16
+local PEAK_HOLD = 2
+
+local PROBE = tern.fs.read("probe.sh")
+local OS = tern.runtime.os
+local WINDOWS = OS == "windows"
+
+local state = {
+	host = "local",
+	compact = tern.kv.get("compact") == true,
+	interval = tonumber(tern.kv.get("interval")) or 2000,
+	machines = false,
+	settings = false,
+	readings = {},
+	history = {},
+	peaks = {},
+	prev = {},
+	error = {},
+	last = {},
+	inflight = {},
+	saves = {},
+}
+
+local lastFocus
+local later
+local restart_tick
+local lastTick = tern.now()
+local timersDead = false
+local tickGen = 0
+local drawQueued = false
+
+local function trim(text)
+	return (tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+local function first(lines)
+	return lines and lines[1] or ""
+end
+
+local function fields(line)
+	local out = {}
+	for word in tostring(line or ""):gmatch("%S+") do out[#out + 1] = word end
+	return out
+end
+
+local function number(value, default)
+	local n = tonumber(value)
+	if n == nil then return default or 0 end
+	return n
+end
+
+local function clamp(value, low, high)
+	return math.max(low, math.min(high, value))
+end
+
+local function rate(before, now, seconds)
+	if not before or now < before or seconds <= 0 then return 0 end
+	return (now - before) / seconds
+end
+
+local function uptime_text(seconds)
+	seconds = math.max(0, math.floor(seconds or 0))
+	local days = math.floor(seconds / 86400)
+	local hours = math.floor((seconds % 86400) / 3600)
+	local minutes = math.floor((seconds % 3600) / 60)
+	if days >= 2 then return string.format("%dd", days) end
+	if hours > 0 then return string.format("%dh", hours) end
+	return string.format("%dm", minutes)
+end
+
+local function disk_name(mount)
+	if mount == "/" then return "/" end
+	return mount:match("([^/]+)/*$") or mount
+end
+
+local function pct_level(value)
+	if value >= 90 then return "hot" end
+	if value >= 80 then return "warn" end
+	return "ok"
+end
+
+local function load_level(value)
+	if value >= 1.5 then return "hot" end
+	if value >= 1.0 then return "warn" end
+	return "ok"
+end
+
+local function rank(level)
+	if level == "hot" then return 2 end
+	if level == "warn" then return 1 end
+	return 0
+end
+
+local function assess(r)
+	local level, why = "ok", ""
+	local function worse(l, w)
+		if rank(l) > rank(level) then level, why = l, w end
+	end
+	worse(pct_level(r.cpu), "cpu")
+	worse(pct_level(r.mem), "memory")
+	if r.swapTotal > 0 and r.swap >= 50 then worse("warn", "swap") end
+	worse(load_level(r.loadPerCore), "load")
+	for _, disk in ipairs(r.disks or {}) do
+		worse(pct_level(disk.pct), disk_name(disk.mount))
+	end
+	return level, why
+end
+
+-- ── probe parsing ─────────────────────────────────────────────────────────
+
+local function sections(text)
+	local out, current = {}, nil
+	for line in (tostring(text or "") .. "\n"):gmatch("(.-)\n") do
+		local name = line:match("^@@([%w_]+)$")
+		if name then
+			current = {}
+			out[name] = current
+		elseif current then
+			current[#current + 1] = (line:gsub("\r$", ""))
+		end
+	end
+	return out
+end
+
+local function parse_df(lines)
+	local out, seen = {}, {}
+	for _, line in ipairs(lines or {}) do
+		local f = fields(line)
+		if #f >= 6 and f[1] ~= "Filesystem" then
+			local dev, mount = f[1], table.concat(f, " ", 6, #f)
+			local size, used = number(f[2]) * 1024, number(f[3]) * 1024
+			local ok = size >= 1073741824 and not seen[dev] and mount ~= ""
+			if ok then
+				local skip = dev == "tmpfs" or dev == "devtmpfs" or dev == "overlay" or dev == "udev"
+					or dev == "none" or dev == "shm" or dev == "efivarfs" or dev == "devfs"
+					or dev == "map" or dev == "squashfs" or dev:match("^/dev/loop")
+				for _, p in ipairs({
+					"/snap", "/run", "/sys", "/proc", "/dev", "/boot", "/var/lib/docker", "/private/var/vm",
+					"/Volumes/Recovery", "/Library/Developer/CoreSimulator", "/private/var/run/com.apple.security.cryptexd",
+				}) do
+					if mount == p or mount:sub(1, #p + 1) == p .. "/" then skip = true end
+				end
+				if mount:sub(1, 16) == "/System/Volumes/" and mount ~= "/System/Volumes/Data" then skip = true end
+				if not skip then
+					seen[dev] = true
+					out[#out + 1] = {
+						mount = mount,
+						size = size,
+						used = used,
+						avail = number(f[4]) * 1024,
+						pct = if size > 0 then 100 * used / size else 0,
+					}
+				end
+			end
+		end
+	end
+	return out
+end
+
+local function real_interface(name)
+	for _, p in ipairs({
+		"lo", "veth", "docker", "br-", "virbr", "cni", "flannel", "cali", "vnet",
+		"tailscale", "wg", "tun", "utun", "awdl", "llw", "bridge", "gif", "stf", "anpi", "ap", "zt",
+	}) do
+		if name:sub(1, #p) == p then return false end
+	end
+	return true
+end
+
+local function parse_net_darwin(lines)
+	local rx, tx = 0, 0
+	for _, line in ipairs(lines or {}) do
+		local f = fields(line)
+		if #f >= 10 and f[3]:sub(1, 5) == "<Link" and real_interface(f[1]) then
+			rx += number(f[#f - 4])
+			tx += number(f[#f - 1])
+		end
+	end
+	return rx, tx
+end
+
+local function parse_net_linux(lines)
+	local rx, tx = 0, 0
+	for _, line in ipairs(lines or {}) do
+		local name, rest = line:match("^%s*([^:]+):(.*)$")
+		if name and real_interface(trim(name)) then
+			local f = fields(rest)
+			rx += number(f[1])
+			tx += number(f[9])
+		end
+	end
+	return rx, tx
+end
+
+local function cpu_values(line)
+	local f = fields(line)
+	local t = {}
+	for i = 1, 8 do t[i] = number(f[i + 1]) end
+	return t
+end
+
+local function cpu_total(t)
+	local total = 0
+	for i = 1, 8 do total += t[i] or 0 end
+	return total
+end
+
+local function cpu_busy(before, after)
+	if not before then return nil end
+	local total = cpu_total(after) - cpu_total(before)
+	if total <= 0 then return nil end
+	local idle = ((after[4] or 0) + (after[5] or 0)) - ((before[4] or 0) + (before[5] or 0))
+	return clamp(100 * (total - idle) / total, 0, 100)
+end
+
+local function cpu_part(before, after, index)
+	if not before then return 0 end
+	local total = cpu_total(after) - cpu_total(before)
+	if total <= 0 then return 0 end
+	local delta = (after[index] or 0) - (before[index] or 0)
+	return clamp(100 * delta / total, 0, 100)
+end
+
+local function parse_linux(r, sec, key)
+	local prev = state.prev[key]
+	local now = tern.now()
+	local cpu_line, per_lines = nil, {}
+	for _, line in ipairs(sec.stat or {}) do
+		local name = line:match("^(%a+%d*)%s")
+		if name == "cpu" then cpu_line = line
+		elseif name and name:match("^cpu%d+$") then per_lines[#per_lines + 1] = line end
+	end
+	local values = cpu_line and cpu_values(cpu_line)
+	local before = prev and prev.cpu
+	if values and before then
+		r.cpu = cpu_busy(before, values) or 0
+		r.user = cpu_part(before, values, 1) + cpu_part(before, values, 2)
+		r.system = cpu_part(before, values, 3)
+		r.iowait = cpu_part(before, values, 5)
+		r.warming = false
+		for i, line in ipairs(per_lines) do
+			local was = prev.cores and prev.cores[i]
+			local busy = was and cpu_busy(was, cpu_values(line))
+			if busy then r.perCore[#r.perCore + 1] = busy end
+		end
+	else
+		r.warming = true
+	end
+	r.cores = #per_lines
+
+	local mem = {}
+	for _, line in ipairs(sec.meminfo or {}) do
+		local k, v = line:match("^(%w+):%s+(%d+)")
+		if k then mem[k] = number(v) * 1024 end
+	end
+	r.memTotal = mem.MemTotal or 0
+	local available = mem.MemAvailable or mem.MemFree or 0
+	r.memUsed = math.max(0, r.memTotal - available)
+	r.mem = if r.memTotal > 0 then 100 * r.memUsed / r.memTotal else 0
+	r.swapTotal = mem.SwapTotal or 0
+	local swap_used = math.max(0, (mem.SwapTotal or 0) - (mem.SwapFree or 0))
+	r.swap = if r.swapTotal > 0 then 100 * swap_used / r.swapTotal else 0
+
+	local load_line = first(sec.loadavg)
+	local lf = fields(load_line)
+	r.load = { number(lf[1]), number(lf[2]), number(lf[3]) }
+	r.loadPerCore = if r.cores > 0 then r.load[1] / r.cores else 0
+
+	r.uptime = uptime_text(number((first(sec.uptime):match("^([%d.]+)"))))
+
+	local rx, tx = parse_net_linux(sec.netdev)
+	local seconds = if prev then math.max(0.2, (now - prev.t) / 1000) else 0
+	r.netRx = rate(prev and prev.rx, rx, seconds)
+	r.netTx = rate(prev and prev.tx, tx, seconds)
+	r.disks = parse_df(sec.df)
+
+	local cores = {}
+	for i, line in ipairs(per_lines) do cores[i] = cpu_values(line) end
+	state.prev[key] = {
+		t = now, rx = rx, tx = tx, cpu = values, cores = cores,
+	}
+end
+
+local function parse_darwin(r, sec, key)
+	local prev = state.prev[key]
+	local now = tern.now()
+	local cores, mem_total = 0, 0
+	local load = { 0, 0, 0 }
+	local boot, swap_total, swap_used = 0, 0, 0
+	local ints = 0
+	for _, line in ipairs(sec.sysctl or {}) do
+		line = trim(line)
+		local lf = fields(line)
+		if line:sub(1, 1) == "{" and #lf >= 3 and lf[2]:match("^[%d.]+$") then
+			load = { number(lf[2]), number(lf[3]), number(lf[4]) }
+		elseif line:match("sec =") then
+			boot = number(line:match("sec = (%d+)"))
+		elseif line:match("total =") then
+			local total, total_unit, used, used_unit = line:match("total = ([%d.]+)([KMGT])%s+used = ([%d.]+)([KMGT])")
+			local mult = { K = 1024, M = 1024 ^ 2, G = 1024 ^ 3, T = 1024 ^ 4 }
+			if total then
+				swap_total = number(total) * (mult[total_unit] or 1)
+				swap_used = number(used) * (mult[used_unit] or 1)
+			end
+		elseif line:match("^%d+$") then
+			ints += 1
+			if ints == 1 then cores = number(line)
+			elseif ints == 2 then mem_total = number(line) end
+		end
+	end
+	r.cores, r.memTotal = cores, mem_total
+	r.load, r.loadPerCore = load, if cores > 0 then load[1] / cores else 0
+	r.swapTotal = swap_total
+	r.swap = if swap_total > 0 then 100 * swap_used / swap_total else 0
+	r.uptime = uptime_text(os.time() - boot)
+
+	local page = 4096
+	local pages = {}
+	for _, line in ipairs(sec.vmstat or {}) do
+		local size = line:match("page size of (%d+) bytes")
+		if size then page = number(size) end
+		local k, v = line:match("^(.-):%s*(%d+)%.?%s*$")
+		if k then pages[trim(k)] = number(v) end
+	end
+	local used = ((pages["Pages active"] or 0) + (pages["Pages wired down"] or 0) + (pages["Pages occupied by compressor"] or 0)) * page
+	r.memUsed = math.max(0, math.min(used, mem_total))
+	r.mem = if mem_total > 0 then 100 * r.memUsed / mem_total else 0
+
+	-- iostat samples a second; its last row is the live one. If it is not
+	-- there, ps's total is the fallback herdr-vitals uses on a Mac.
+	local cpu_line = ""
+	for _, line in ipairs(sec.cpu or {}) do
+		if line:match("^%s*[%d.]+%s+[%d.]+%s+[%d.]+") then cpu_line = line end
+	end
+	local parsed_cpu = false
+	if cpu_line ~= "" then
+		local f = fields(cpu_line)
+		-- iostat's row ends with us, sy, id and the three load averages.
+		local n = #f
+		if n >= 6 then
+			r.user, r.system = number(f[n - 5]), number(f[n - 4])
+			r.cpu = clamp(r.user + r.system, 0, 100)
+			parsed_cpu = true
+		end
+	end
+	if not parsed_cpu then
+		local total = 0
+		for _, line in ipairs(sec.ps or {}) do total += number(trim(line)) end
+		r.cpu = if cores > 0 then clamp(total / cores, 0, 100) else 0
+	end
+	r.warming = false
+
+	local rx, tx = parse_net_darwin(sec.netstat)
+	local seconds = if prev then math.max(0.2, (now - prev.t) / 1000) else 0
+	r.netRx = rate(prev and prev.rx, rx, seconds)
+	r.netTx = rate(prev and prev.tx, tx, seconds)
+	r.disks = parse_df(sec.df)
+	-- The data volume is where a Mac's files live; the sealed system volume
+	-- is the same size and would only repeat it.
+	local has_data = false
+	for _, disk in ipairs(r.disks) do
+		if disk.mount == "/System/Volumes/Data" then has_data = true end
+	end
+	if has_data then
+		for i = #r.disks, 1, -1 do
+			if r.disks[i].mount == "/" then table.remove(r.disks, i) end
+		end
+	end
+	state.prev[key] = { t = now, rx = rx, tx = tx }
+end
+
+local function parse(text, key)
+	local sec = sections(text)
+	local os_name = trim(first(sec.os))
+	local r = {
+		os = if os_name == "Darwin" then "darwin" else "linux",
+		host = trim(first(sec.host)),
+		release = trim(first(sec.release)),
+		kernel = trim(first(sec.kernel)),
+		arch = trim(first(sec.arch)),
+		cores = 0, uptime = "", warming = false,
+		cpu = 0, user = 0, system = 0, iowait = 0, perCore = {},
+		load = { 0, 0, 0 }, loadPerCore = 0,
+		mem = 0, memTotal = 0, memUsed = 0, swap = 0, swapTotal = 0,
+		netRx = 0, netTx = 0, disks = {},
+	}
+	if r.os == "darwin" then
+		parse_darwin(r, sec, key)
+	else
+		parse_linux(r, sec, key)
+	end
+	r.level, r.why = assess(r)
+	return r
+end
+
+-- ── history and bands ─────────────────────────────────────────────────────
+
+local function history_of(key)
+	local points = state.history[key]
+	if not points then
+		local stored = tern.kv.get("history:" .. key)
+		points = if type(stored) == "table" then stored else {}
+		for i = #points, 1, -1 do
+			local p = points[i]
+			if type(p) ~= "table" or type(p.c) ~= "number" then table.remove(points, i) end
+		end
+		state.history[key] = points
+	end
+	return points
+end
+
+local function save_history(key)
+	tern.kv.set("history:" .. key, state.history[key] or {})
+end
+
+local function bands_for(r, points)
+	if #r.perCore > 0 then
+		local per = math.ceil(#r.perCore / MAX_BANDS)
+		local out = {}
+		for i = 1, #r.perCore, per do
+			local sum, count = 0, 0
+			for j = i, math.min(i + per - 1, #r.perCore) do
+				sum += r.perCore[j]
+				count += 1
+			end
+			out[#out + 1] = sum / count
+		end
+		return out
+	end
+	local out = {}
+	local take = math.min(MAX_BANDS, #points)
+	local offset = MAX_BANDS - take
+	for i = 1, MAX_BANDS do out[i] = 0 end
+	for i = 1, take do out[offset + i] = points[#points - take + i].c or 0 end
+	return out
+end
+
+local function update_peaks(key, bands)
+	local peaks = state.peaks[key] or {}
+	for i = 1, #bands do
+		local lit = math.floor(clamp(bands[i], 0, 100) / 100 * SEGMENTS + 0.5)
+		local peak = peaks[i] or { at = 0, hold = 0 }
+		if lit >= peak.at then
+			peak = { at = lit, hold = PEAK_HOLD }
+		elseif peak.hold > 0 then
+			peak.hold -= 1
+		else
+			peak.at = math.max(lit, peak.at - 1)
+			peak.hold = 0
+		end
+		peaks[i] = peak
+	end
+	state.peaks[key] = peaks
+	return peaks
+end
+
+local function record(r, key)
+	local points = history_of(key)
+	if not r.warming then
+		points[#points + 1] = {
+			t = os.time(), c = r.cpu, l = r.loadPerCore, m = r.mem,
+			n = r.netRx + r.netTx, d = 0,
+		}
+		while #points > MAX_POINTS do table.remove(points, 1) end
+		state.saves[key] = (state.saves[key] or 0) + 1
+		if state.saves[key] >= 5 then
+			save_history(key)
+			state.saves[key] = 0
+		end
+	end
+	local bands = bands_for(r, points)
+	r.bands = bands
+	r.peaks = update_peaks(key, bands)
+end
+
+-- ── machines ──────────────────────────────────────────────────────────────
+
+local function host_list(cx)
+	local out = { { key = "local", label = "This computer", kind = "local", state = "connected" } }
+	for _, host in ipairs(cx.hosts:list()) do
+		if host.kind == "remote" then
+			out[#out + 1] = {
+				key = "h" .. tostring(host.id),
+				label = host.name or host.address or ("Host " .. tostring(host.id)),
+				kind = "remote",
+				address = host.address,
+				state = host.state,
+			}
+		end
+	end
+	return out
+end
+
+local function host_by_key(cx, key)
+	for _, host in ipairs(host_list(cx)) do
+		if host.key == key then return host end
+	end
+	return host_list(cx)[1]
+end
+
+local function panel(cx)
+	for _, canvas in ipairs(cx.canvas:list()) do
+		if canvas.owner == "tern-vitals" then return canvas.pane end
+	end
+	return nil
+end
+
+-- ── sampling ──────────────────────────────────────────────────────────────
+
+local function snapshot(cx)
+	local key = state.host
+	return {
+		host = host_by_key(cx, key),
+		hosts = host_list(cx),
+		reading = state.readings[key],
+		history = history_of(key),
+		compact = state.compact,
+		settings = state.settings,
+		machines = state.machines,
+		error = state.error[key],
+		interval = state.interval,
+	}
+end
+
+local function draw(cx)
+	local pane = panel(cx)
+	if not pane then return end
+	local ok, err = pcall(function()
+		cx.canvas:set(pane, { view = view.render(snapshot(cx)) })
+	end)
+	if not ok then tern.log.warn("vitals: " .. tostring(err)) end
+end
+
+local function redraw(cx)
+	if drawQueued then return end
+	drawQueued = true
+	later(0, function(c)
+		drawQueued = false
+		if c then draw(c) end
+	end)
+end
+
+local function sample(cx, key)
+	if state.inflight[key] then return end
+	local host = host_by_key(cx, key)
+	if WINDOWS then
+		state.error[key] = "Vitals reads macOS and Linux hosts."
+		redraw(cx)
+		return
+	end
+	local argv, opts
+	if host.kind == "local" then
+		argv = { "/bin/sh", "-c", PROBE }
+		opts = { timeout_ms = 8000 }
+	elseif type(host.address) == "string" and host.address ~= "" then
+		local endpoint, port = host.address:match("^(.-):(%d+)$")
+		argv = { "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=4", "-o", "ServerAliveInterval=5" }
+		if port then
+			argv[#argv + 1] = "-p"
+			argv[#argv + 1] = port
+			argv[#argv + 1] = endpoint
+		else
+			argv[#argv + 1] = host.address
+		end
+		argv[#argv + 1] = "sh"
+		argv[#argv + 1] = "-s"
+		opts = { stdin = PROBE, timeout_ms = 12000 }
+	else
+		state.error[key] = "This host has no ssh address yet."
+		redraw(cx)
+		return
+	end
+	state.inflight[key] = true
+	local ok, err = pcall(tern.process.run, argv, opts, function(result, c)
+		state.inflight[key] = false
+		if not c then return end
+		if result.timed_out or result.status ~= 0 then
+			local message = trim(result.stderr)
+			if result.timed_out then message = "Timed out reading the machine." end
+			if message == "" then message = "Could not read the machine (exit " .. tostring(result.status) .. ")." end
+			state.error[key] = message
+			redraw(c)
+			return
+		end
+		local parsed_ok, reading = pcall(parse, result.stdout, key)
+		if not parsed_ok then
+			state.error[key] = tostring(reading)
+			redraw(c)
+			return
+		end
+		state.error[key] = nil
+		state.readings[key] = reading
+		state.last[key] = tern.now()
+		record(reading, key)
+		redraw(c)
+	end)
+	if not ok then
+		state.inflight[key] = false
+		state.error[key] = tostring(err)
+		redraw(cx)
+	end
+end
+
+-- ── timers ────────────────────────────────────────────────────────────────
+
+local function check_timers()
+	if timersDead or tern.now() - lastTick < 8000 then return false end
+	timersDead = true
+	tern.log.warn("vitals: Tern disabled this plugin's timers; deferring through processes")
+	if restart_tick then restart_tick() end
+	return true
+end
+
+later = function(ms, fn)
+	check_timers()
+	if timersDead then
+		local argv = if WINDOWS then { "powershell.exe", "-NoProfile", "-Command", "Start-Sleep -Milliseconds " .. tostring(math.floor(ms)) }
+			else { "/bin/sleep", string.format("%.3f", ms / 1000) }
+		pcall(tern.process.run, argv, { timeout_ms = ms + 5000 }, function(_result, cx) fn(cx) end)
+	else
+		tern.timer(ms, fn)
+	end
+end
+
+local function tick(gen, cx)
+	if not cx or gen ~= tickGen then return end
+	lastTick = tern.now()
+	local pane = panel(cx)
+	if pane and not state.inflight[state.host] then
+		local last = state.last[state.host]
+		if not last or tern.now() - last >= state.interval then sample(cx, state.host) end
+	end
+	later(state.interval, function(c) tick(gen, c) end)
+end
+
+restart_tick = function()
+	lastTick = tern.now()
+	tickGen += 1
+	local gen = tickGen
+	drawQueued = false
+	later(0, function(cx) tick(gen, cx) end)
+end
+
+-- ── panel lifecycle ───────────────────────────────────────────────────────
+
+local function focus_back(cx)
+	if lastFocus and cx.session:pane(lastFocus) then cx.layout:focus(lastFocus) end
+end
+
+local function open_panel(cx)
+	lastFocus = cx.session:focused()
+	local pane, err = cx.canvas:open({
+		title = TITLE,
+		about = ABOUT,
+		view = tern.ui.text({ tern.ui.span("Reading…", "muted") }),
+		how = "beside",
+		focus = false,
+		ratio = 0.34,
+	})
+	if not pane then
+		cx:toast("error", "Vitals", err or "Could not open the panel")
+		return
+	end
+	sample(cx, state.host)
+	redraw(cx)
+end
+
+local function toggle(cx)
+	local pane = panel(cx)
+	if pane then
+		cx.layout:close(pane)
+		focus_back(cx)
+	else
+		open_panel(cx)
+	end
+end
+
+local function add_machine(cx)
+	local ok, list = pcall(function() return cx.actions:list("Add remote host") end)
+	if ok and type(list) == "table" and list[1] then
+		if pcall(function() cx.actions:run(list[1].id) end) then return end
+	end
+	pcall(function() cx:command("add_remote_host") end)
+end
+
+local function toggle_settings(cx)
+	state.settings = not state.settings
+	if not panel(cx) then open_panel(cx) end
+	redraw(cx)
+end
+
+local function choose_host(cx, key)
+	state.host = key
+	tern.kv.set("host", key)
+	if not state.readings[key] and not state.inflight[key] then sample(cx, key) end
+	redraw(cx)
+end
+
+local function step_host(cx, delta)
+	local list = host_list(cx)
+	local index = 1
+	for i, host in ipairs(list) do
+		if host.key == state.host then index = i end
+	end
+	local next = ((index - 1 + delta) % #list) + 1
+	choose_host(cx, list[next].key)
+end
+
+-- ── events and commands ───────────────────────────────────────────────────
+
+tern.command({
+	id = "toggle",
+	title = "Vitals: show or hide",
+	icon = "activity",
+	keys = { "cmd+alt+v" },
+	run = toggle,
+})
+
+tern.command({
+	id = "settings",
+	title = "Vitals: settings",
+	icon = "gear",
+	run = toggle_settings,
+})
+
+tern.command({
+	id = "add-machine",
+	title = "Vitals: add machine",
+	icon = "plus",
+	run = function(cx) add_machine(cx) end,
+})
+
+tern.command({
+	id = "next",
+	title = "Vitals: next machine",
+	icon = "server",
+	run = function(cx) step_host(cx, 1) end,
+})
+
+tern.command({
+	id = "prev",
+	title = "Vitals: previous machine",
+	icon = "server",
+	run = function(cx) step_host(cx, -1) end,
+})
+
+tern.command({
+	id = "compact",
+	title = "Vitals: compact or full",
+	icon = "monitor",
+	run = function(cx)
+		state.compact = not state.compact
+		tern.kv.set("compact", state.compact)
+		redraw(cx)
+	end,
+})
+
+tern.on("canvas_action", function(ev, cx)
+	if ev.owner ~= "tern-vitals" then return nil end
+	local act, value = ev.act, ev.value
+	if value == nil then
+		act, value = string.match(tostring(ev.act or ""), "^([^=]+)=?(.*)$")
+		if value == "" then value = nil end
+	end
+	if act == "machines" then
+		state.machines = not state.machines
+	elseif act == "machine" and value then
+		state.machines = false
+		choose_host(cx, value)
+	elseif act == "compact" then
+		state.compact = not state.compact
+		tern.kv.set("compact", state.compact)
+	elseif act == "settings" then
+		state.settings = not state.settings
+	elseif act == "interval" then
+		local choices = { 2000, 5000, 10000 }
+		local index = 1
+		for i, ms in ipairs(choices) do
+			if state.interval == ms then index = i end
+		end
+		state.interval = choices[(index % #choices) + 1]
+		tern.kv.set("interval", state.interval)
+	elseif act == "reset-history" then
+		state.history[state.host] = {}
+		state.peaks[state.host] = {}
+		tern.kv.set("history:" .. state.host, nil)
+	elseif act == "add-machine" then
+		focus_back(cx)
+		add_machine(cx)
+		return true
+	elseif act == "close" then
+		local pane = panel(cx)
+		if pane then cx.layout:close(pane) end
+		focus_back(cx)
+	else
+		return false
+	end
+	focus_back(cx)
+	redraw(cx)
+	return true
+end)
+
+tern.on("window_start", function(cx)
+	local saved = tern.kv.get("host")
+	if type(saved) == "string" then state.host = saved end
+	local known = false
+	for _, host in ipairs(host_list(cx)) do
+		if host.key == state.host then known = true end
+	end
+	if not known then state.host = "local" end
+	if panel(cx) then sample(cx, state.host) end
+	restart_tick()
+end)

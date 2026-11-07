@@ -1,0 +1,463 @@
+/* Vitals: spacing and shading only. Every colour comes from Tern's theme;
+   plugin sheets are global, so every rule is scoped to a vitals role. */
+
+[data-role='vitals.root'] {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  color: var(--t1);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+[data-role='vitals.head'] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+[data-role='vitals.head'] > .sf-icon {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
+[data-role='vitals.title'] {
+  flex: none;
+  color: var(--t1);
+  font-size: 13px;
+  font-weight: 600;
+}
+[data-role='vitals.spacer'] {
+  flex: 1 1 auto;
+  min-width: 4px;
+}
+
+[data-role='vitals.machine'] {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  max-width: 180px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--l2);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--t1);
+  font: inherit;
+  cursor: pointer;
+}
+[data-role='vitals.machine']:hover,
+[data-role='vitals.machine'].open {
+  background: var(--l1);
+}
+[data-role='vitals.machine-name'] {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--t1);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-role='vitals.iconbtn'] {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+}
+[data-role='vitals.iconbtn']:hover {
+  background: var(--l1);
+  color: var(--t1);
+}
+
+[data-role='vitals.menu'] {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  border: 1px solid var(--l2);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 8px 24px -12px rgb(0 0 0 / 45%);
+}
+[data-role='vitals.mrow'] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--t1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+[data-role='vitals.mrow']:hover {
+  background: var(--l1);
+}
+[data-role='vitals.mrow'].on {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+[data-role='vitals.mrow-name'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-role='vitals.mrow-meta'] {
+  flex: none;
+  color: var(--t3);
+  font-size: 10.5px;
+}
+
+[data-role='vitals.hostline'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+[data-role='vitals.hostname'] {
+  flex: none;
+  color: var(--t1);
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-role='vitals.hostmeta'] {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--t3);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-role='vitals.badge'] {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  color: var(--t3);
+  background: color-mix(in srgb, var(--t3) 10%, transparent);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+[data-role='vitals.badge'].ok {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 13%, transparent);
+}
+[data-role='vitals.badge'].warn {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 15%, transparent);
+}
+[data-role='vitals.badge'].hot {
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 15%, transparent);
+}
+[data-role='vitals.dot'] {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+[data-role='vitals.error'] {
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 10%, transparent);
+  font-size: 11.5px;
+}
+
+[data-role='vitals.section'] {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 3px;
+}
+[data-role='vitals.section-title'] {
+  flex: none;
+  color: var(--t3);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+[data-role='vitals.rule'] {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--l2);
+}
+
+[data-role='vitals.cpuflex'] {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  min-width: 0;
+}
+[data-role='vitals.eq'] {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-end;
+  gap: 3px;
+  height: 112px;
+  min-width: 0;
+}
+[data-role='vitals.band'] {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column-reverse;
+  gap: 2px;
+  min-width: 0;
+}
+[data-role='vitals.seg'] {
+  height: 5px;
+  border-radius: 1.5px;
+  background: color-mix(in srgb, var(--t3) 14%, transparent);
+}
+[data-role='vitals.seg'].on.vok {
+  background: var(--ok);
+}
+[data-role='vitals.seg'].on.vwarn {
+  background: var(--warn);
+}
+[data-role='vitals.seg'].on.vbad {
+  background: var(--bad);
+}
+[data-role='vitals.seg'].peak {
+  opacity: 0.4;
+}
+[data-role='vitals.cpuside'] {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  width: 86px;
+  gap: 1px;
+  padding-bottom: 2px;
+}
+[data-role='vitals.cpuside'].compact {
+  gap: 4px;
+}
+[data-role='vitals.cpunum'] {
+  color: var(--ok);
+  font-family: var(--mono);
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+[data-role='vitals.cpunum.warn'] {
+  color: var(--warn);
+}
+[data-role='vitals.cpunum.hot'] {
+  color: var(--bad);
+}
+[data-role='vitals.cpucap'] {
+  color: var(--t3);
+  font-size: 11px;
+}
+[data-role='vitals.cpusub'] {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--t3);
+  font-size: 10px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-role='vitals.strip'] {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 1px;
+  height: 28px;
+  padding: 1px 0;
+  min-width: 0;
+  overflow: hidden;
+}
+[data-role='vitals.stripcol'] {
+  flex: none;
+  width: 3px;
+  border-radius: 1px;
+  background: var(--ok);
+}
+[data-role='vitals.stripcol'].vwarn {
+  background: var(--warn);
+}
+[data-role='vitals.stripcol'].vbad {
+  background: var(--bad);
+}
+[data-role='vitals.stripcol'].vok {
+  background: color-mix(in srgb, var(--ok) 75%, transparent);
+}
+
+/* The history strip's height is a class, so no inline styles are needed. */
+[data-role='vitals.stripcol'].vitals-h0 { height: 2%; }
+[data-role='vitals.stripcol'].vitals-h1 { height: 5%; }
+[data-role='vitals.stripcol'].vitals-h2 { height: 10%; }
+[data-role='vitals.stripcol'].vitals-h3 { height: 15%; }
+[data-role='vitals.stripcol'].vitals-h4 { height: 20%; }
+[data-role='vitals.stripcol'].vitals-h5 { height: 25%; }
+[data-role='vitals.stripcol'].vitals-h6 { height: 30%; }
+[data-role='vitals.stripcol'].vitals-h7 { height: 35%; }
+[data-role='vitals.stripcol'].vitals-h8 { height: 40%; }
+[data-role='vitals.stripcol'].vitals-h9 { height: 45%; }
+[data-role='vitals.stripcol'].vitals-h10 { height: 50%; }
+[data-role='vitals.stripcol'].vitals-h11 { height: 55%; }
+[data-role='vitals.stripcol'].vitals-h12 { height: 60%; }
+[data-role='vitals.stripcol'].vitals-h13 { height: 65%; }
+[data-role='vitals.stripcol'].vitals-h14 { height: 70%; }
+[data-role='vitals.stripcol'].vitals-h15 { height: 75%; }
+[data-role='vitals.stripcol'].vitals-h16 { height: 80%; }
+[data-role='vitals.stripcol'].vitals-h17 { height: 85%; }
+[data-role='vitals.stripcol'].vitals-h18 { height: 90%; }
+[data-role='vitals.stripcol'].vitals-h19 { height: 95%; }
+[data-role='vitals.stripcol'].vitals-h20 { height: 100%; }
+
+[data-role='vitals.row'] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+[data-role='vitals.label'] {
+  flex: none;
+  width: 52px;
+  overflow: hidden;
+  color: var(--t3);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-role='vitals.value'] {
+  flex: none;
+  width: 46px;
+  color: var(--t1);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+[data-role='vitals.sub'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--t3);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-role='vitals.meter'] {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1px;
+  height: 11px;
+}
+[data-role='vitals.mseg'] {
+  width: 4px;
+  height: 100%;
+  border-radius: 1.5px;
+  background: color-mix(in srgb, var(--t3) 14%, transparent);
+}
+[data-role='vitals.mseg'].on.vok {
+  background: var(--ok);
+}
+[data-role='vitals.mseg'].on.vwarn {
+  background: var(--warn);
+}
+[data-role='vitals.mseg'].on.vbad {
+  background: var(--bad);
+}
+[data-role='vitals.mseg'].on.accent {
+  background: var(--accent);
+}
+[data-role='vitals.mseg'].on.live {
+  background: var(--live);
+}
+
+[data-role='vitals.settings'] {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  border: 1px solid var(--l2);
+  border-radius: 8px;
+  background: var(--l1);
+}
+.vitals-root .vitals-srow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 0 !important;
+  border-radius: 5px;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--t1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.vitals-root .vitals-srow:hover {
+  background: var(--l1) !important;
+}
+[data-role='vitals.srow-name'] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+[data-role='vitals.srow-value'] {
+  color: var(--t3);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+[data-role='vitals.foot'] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 2px;
+}
+.vitals-root .vitals-footrow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  height: 26px;
+  padding: 0 6px;
+  border: 0 !important;
+  border-radius: 5px;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--t2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.vitals-root .vitals-footrow:hover {
+  color: var(--t1);
+  background: var(--l1) !important;
+}
