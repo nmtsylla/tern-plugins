@@ -2,7 +2,7 @@
 
 A workspaces sidebar for [Tern](https://stencil.so/tern). Every Tern session is a workspace card. Under each card you switch between its agents (tabs and panes), its files, its git changes and its branches. Agent state is live, anything that finished while you were away is marked, and everything can be reordered.
 
-![Kai in a Tern window](docs/images/hero.png)
+<img src="docs/images/sidebar.png" width="400" alt="Kai's sidebar">
 
 ## Install
 
@@ -18,10 +18,7 @@ Optional: PR badges need the [GitHub CLI](https://cli.github.com) (`gh`) signed 
 
 ## What you see
 
-<p>
-  <img src="docs/images/sidebar.png" width="380" alt="Agents view">
-  <img src="docs/images/changes.png" width="380" alt="Changes view">
-</p>
+<img src="docs/images/changes.png" width="380" alt="Changes view">
 
 - **Workspace card:** one line: a colored tile (the initial, or an icon you pick) and the name, with the folder dim at the right and how far the branch is from its upstream (`↑2`). The folder follows the pane you are in. Linear ticket and PR badges sit after it. Under the card you are in, a row of pills switches between its Agents, Files, Diffs and Refs: icons with their counts, the open one named. A folded card shows a one-line summary (`3 tabs · 1 working · main`). Cards only fold when you fold them.
 - **Agents:** one row per pane. A single-pane tab is one row; a split tab is a foldable group. A spinner while an agent works, a pulsing dot while it waits for you, ✓ when it finished while you were elsewhere, ✗ when a command failed. The agent's last reply shows as a second line, and the model is in the tooltip.
@@ -66,7 +63,7 @@ Workspaces sit under one foldable header per machine (this computer first, then 
 
 - `window.luau` holds the model (sessions, tabs, panes, agent state, git, files), the per-tab panel, clicks, menus and commands. `view.luau` turns the model into Tern-native nodes. `styles.css` sets Tern's sans face, spacing and shading, scoped to `kai.*` roles. `vitals.luau` samples the current host (local or over ssh) every two seconds with `probe.sh`; its reading is part of the same model and is drawn in the canvas dock, so it stays pinned while the workspaces scroll.
 - Tern has no window-level sidebar API, so each tab gets its own canvas pane as a full-height left column. A tab that is already split is rebuilt around it, keeping its shape and ratios. Only the visible tab's panel redraws; the others catch up when shown.
-- Tern gives each callback a 50 ms budget. Drawing runs in its own timer callback, git reads are asynchronous, and folder listings run in the background with a 10 s cache. If a stall (sleep, heavy load) makes Tern disable the plugin's timers, Kai notices and keeps working through process callbacks until the next reload.
+- Tern gives each callback a 50 ms budget. Drawing runs in its own timer callback, git reads are asynchronous, and folder listings run in the background with a 10 s cache. If a stall (sleep, heavy load) makes Tern disable the plugin's timers, Kai notices and keeps working through process callbacks until the next reload. A gap of a minute or more counts as the system having paused the app, not an overrun, so that recovery is logged quietly.
 - Fold state, views, workspace order, icons, colors, the Ice Box, unseen marks and settings live in Tern's plugin storage.
 
 **Limits:** Tern canvases only receive clicks, so reordering is pick-then-place rather than drag. The thin scrollbar style applies to all canvases, so other plugins' canvases get it too. Remote workspaces show agent state but no change counts, PR or ticket badges on the card. On macOS Vitals shows a short history of the whole CPU as its bands, because per-core shares need root; Windows is not read.

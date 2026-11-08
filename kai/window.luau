@@ -167,24 +167,38 @@ local lastTick = tern.now()
 local timersDead = false
 
 -- A hook Tern disabled stays dead until the plugin reloads, so Kai reloads itself: once, and at most
--- once a minute across reloads (the time is kept in the store), so a real bug can't loop.
-local function selfReload(why)
+-- once a minute across reloads (the time is kept in the store), so a real bug can't loop. A pause long
+-- enough to be the system sleeping or coalescing timers is not a budget overrun: it says so, quietly.
+local function selfReload(why, quiet)
 	local last = tonumber(tern.kv.get("self-reload")) or 0
 	local now = os.time()
 	if now - last < 60 then return end
 	tern.kv.set("self-reload", now)
-	tern.log.warn("kai: " .. why .. "; reloading the plugin to bring it back")
+	if quiet then
+		tern.log.info("kai: " .. why .. "; reloading the plugin to bring it back")
+	else
+		tern.log.warn("kai: " .. why .. "; reloading the plugin to bring it back")
+	end
 	local exe = if WINDOWS then "tern.exe" elseif MAC then "/Applications/Tern.app/Contents/MacOS/tern" else "tern"
 	pcall(tern.process.run, { exe, "plugin", "reload" }, { timeout_ms = 15000 }, function() end)
 end
 
--- True when this call noticed the timers died.
+-- True when this call noticed the timers died. A gap of a minute or more is the system having paused
+-- the app (sleep, App Nap, a stalled clock), not a callback overrunning its 50 ms: the timers still
+-- need the reload, but the log should not call it an overrun.
 local function checkTimers()
-	if timersDead or tern.now() - lastTick < 3000 then return false end
+	if timersDead then return false end
+	local gap = tern.now() - lastTick
+	if gap < 3000 then return false end
 	timersDead = true
-	tern.log.warn("kai: Tern disabled this plugin's timers after a budget overrun; deferring through processes until reload")
+	local paused = gap >= 60000
+	if paused then
+		tern.log.info("kai: timers paused for " .. tostring(math.floor(gap / 1000)) .. " s; deferring through processes until reload")
+	else
+		tern.log.warn("kai: Tern disabled this plugin's timers after a budget overrun; deferring through processes until reload")
+	end
 	restartTick()
-	selfReload("Tern disabled Kai's timers")
+	selfReload(if paused then "Kai's timers paused while the system slept" else "Tern disabled Kai's timers", paused)
 	return true
 end
 
